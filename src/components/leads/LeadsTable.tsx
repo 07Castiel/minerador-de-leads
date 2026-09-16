@@ -1,11 +1,11 @@
+"use client"
+
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useRouter } from "next/navigation"
 import { flexRender, type SortingState } from "@tanstack/react-table"
-// react-table v9 restructured its core API around tree-shakeable "features"
-// (see useTable/tableFeatures). We use the official v8-compatibility layer
-// instead of adopting that new API — it's fully supported, just deprecated
-// in favor of the new shape, and matches the plan's simplicity priority for
-// what's a straightforward sortable table.
+// react-table v9 reorganizou a API em "features"; usamos a camada de
+// compatibilidade v8, suportada oficialmente e suficiente para uma tabela
+// ordenável simples.
 import {
   getCoreRowModel,
   getSortedRowModel,
@@ -13,8 +13,11 @@ import {
   useLegacyTable as useReactTable,
   type LegacyColumnDef,
 } from "@tanstack/react-table/legacy"
-import { ArrowDownIcon, ArrowUpIcon, ArrowUpDownIcon, CheckIcon, XIcon } from "lucide-react"
+import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, CheckIcon, XIcon } from "lucide-react"
 
+import { EtapaBadge } from "@/components/leads/EtapaBadge"
+import { TemperaturaBadge } from "@/components/leads/TemperaturaBadge"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -23,9 +26,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import { StatusBadge } from "@/components/leads/StatusBadge"
-import { TemperaturaBadge } from "@/components/leads/TemperaturaBadge"
 import type { Lead } from "@/types/lead"
 
 const columnHelper = createColumnHelper<Lead>()
@@ -39,6 +39,10 @@ const columns: LegacyColumnDef<Lead, any>[] = [
     header: "Categoria",
     cell: (info) => info.getValue() ?? "—",
   }),
+  columnHelper.accessor("telefone", {
+    header: "Telefone",
+    cell: (info) => <span className="whitespace-nowrap tabular-nums">{info.getValue() ?? "—"}</span>,
+  }),
   columnHelper.accessor("bairro", {
     header: "Bairro",
     cell: (info) => info.getValue() ?? "—",
@@ -49,29 +53,29 @@ const columns: LegacyColumnDef<Lead, any>[] = [
       const value = info.getValue()
       if (value === null) return <span className="text-muted-foreground">?</span>
       return value ? (
-        <CheckIcon className="size-4 text-muted-foreground" />
+        <CheckIcon className="size-4 text-muted-foreground" aria-label="Tem site" />
       ) : (
-        <XIcon className="size-4 text-destructive" />
+        <XIcon className="size-4 text-destructive" aria-label="Sem site" />
       )
     },
   }),
   columnHelper.accessor("score", {
     header: "Score",
-    cell: (info) => info.getValue(),
+    cell: (info) => info.getValue() ?? "—",
   }),
   columnHelper.accessor("temperatura", {
     header: "Temperatura",
     cell: (info) => <TemperaturaBadge temperatura={info.getValue()} />,
   }),
-  columnHelper.accessor("status", {
-    header: "Status",
-    cell: (info) => <StatusBadge status={info.getValue()} />,
+  columnHelper.accessor("etapa", {
+    header: "Etapa",
+    cell: (info) => <EtapaBadge etapa={info.getValue()} />,
   }),
 ]
 
 export function LeadsTable({ leads }: { leads: Lead[] }) {
-  const navigate = useNavigate()
-  const [sorting, setSorting] = useState<SortingState>([{ id: "score", desc: true }])
+  const router = useRouter()
+  const [sorting, setSorting] = useState<SortingState>([])
 
   const table = useReactTable({
     data: leads,
@@ -124,7 +128,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
               <TableRow
                 key={row.id}
                 className="cursor-pointer"
-                onClick={() => navigate(`/leads/${row.original.id}`)}
+                onClick={() => router.push(`/leads/${row.original.id}`)}
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>

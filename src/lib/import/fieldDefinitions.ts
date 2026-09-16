@@ -48,7 +48,10 @@ export const IMPORT_CONTROLLED_FIELDS: readonly ImportControlledField[] =
 // inversa, só pra deixar explícito em código (não é usada em runtime,
 // serve de documentação viva + guarda em teste).
 export const NEVER_IMPORTED_FIELDS = [
-  "status",
+  "etapa",
+  "etapa_atualizada_em",
+  "motivo_perda",
+  "no_funil",
   "observacoes",
   "instagram_handle",
   "instagram_seguidores",

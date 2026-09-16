@@ -1,9 +1,10 @@
+"use client"
+
 import { useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -11,22 +12,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { useUpdateLead } from "@/hooks/useLead"
-import { STATUS_LABELS, STATUS_VALUES } from "@/types/lead"
-import type { Lead } from "@/types/lead"
+import { dadosDaMudancaDeEtapa } from "@/hooks/useLeads"
+import {
+  ETAPAS,
+  ETAPA_LABELS,
+  MOTIVOS_PERDA,
+  MOTIVO_PERDA_LABELS,
+  isEtapa,
+  type Etapa,
+  type Lead,
+  type MotivoPerda,
+} from "@/types/lead"
 
 export function LeadEditForm({ lead }: { lead: Lead }) {
-  const [status, setStatus] = useState(lead.status ?? "novo")
+  const etapaInicial: Etapa = isEtapa(lead.etapa) ? lead.etapa : "novo"
+  const [etapa, setEtapa] = useState<Etapa>(etapaInicial)
+  const [motivo, setMotivo] = useState<MotivoPerda | "">((lead.motivo_perda as MotivoPerda | null) ?? "")
   const [observacoes, setObservacoes] = useState(lead.observacoes ?? "")
   const updateLead = useUpdateLead(lead.id)
 
-  const isDirty = status !== (lead.status ?? "novo") || observacoes !== (lead.observacoes ?? "")
+  const mudouEtapa = etapa !== etapaInicial || (etapa === "perdido" && motivo !== (lead.motivo_perda ?? ""))
+  const mudouObservacoes = observacoes !== (lead.observacoes ?? "")
+  const faltaMotivo = etapa === "perdido" && motivo === ""
 
   function handleSave() {
     updateLead.mutate(
-      { status, observacoes: observacoes.trim() === "" ? null : observacoes },
       {
-        onSuccess: () => toast.success("Lead atualizado."),
+        ...(mudouEtapa ? dadosDaMudancaDeEtapa({ id: lead.id, etapa, motivoPerda: motivo || null }) : {}),
+        observacoes: observacoes.trim() === "" ? null : observacoes,
+        ...(lead.no_funil ? {} : { no_funil: true }),
+      },
+      {
+        onSuccess: () => toast.success(lead.no_funil ? "Lead atualizado." : "Lead salvo e enviado ao CRM."),
         onError: (err) => toast.error(`Erro ao salvar: ${err.message}`),
       }
     )
@@ -34,37 +53,61 @@ export function LeadEditForm({ lead }: { lead: Lead }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="status">Status</Label>
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger id="status" className="w-56">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_VALUES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {STATUS_LABELS[s]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap gap-4">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="etapa">Etapa</Label>
+          <Select value={etapa} onValueChange={(v) => setEtapa(v as Etapa)}>
+            <SelectTrigger id="etapa" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ETAPAS.map((e) => (
+                <SelectItem key={e} value={e}>
+                  {ETAPA_LABELS[e]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {etapa === "perdido" && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="motivo-perda">Motivo da perda</Label>
+            <Select value={motivo} onValueChange={(v) => setMotivo(v as MotivoPerda)}>
+              <SelectTrigger id="motivo-perda" className="w-64" aria-invalid={faltaMotivo}>
+                <SelectValue placeholder="Escolha o motivo" />
+              </SelectTrigger>
+              <SelectContent>
+                {MOTIVOS_PERDA.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {MOTIVO_PERDA_LABELS[m]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="observacoes">Observações</Label>
         <Textarea
           id="observacoes"
-          rows={5}
+          rows={6}
           value={observacoes}
           onChange={(e) => setObservacoes(e.target.value)}
-          placeholder="Anotações sobre contato, visita, proposta..."
+          placeholder="Como foi o contato, o que o dono falou, próximos passos..."
         />
       </div>
 
-      <div>
-        <Button onClick={handleSave} disabled={!isDirty || updateLead.isPending}>
-          {updateLead.isPending ? "Salvando..." : "Salvar"}
+      <div className="flex items-center gap-3">
+        <Button
+          onClick={handleSave}
+          disabled={(!mudouEtapa && !mudouObservacoes && lead.no_funil) || faltaMotivo || updateLead.isPending}
+        >
+          {updateLead.isPending ? "Salvando..." : lead.no_funil ? "Salvar" : "Salvar e enviar ao CRM"}
         </Button>
+        {faltaMotivo && <span className="text-sm text-muted-foreground">Escolha o motivo da perda.</span>}
       </div>
     </div>
   )

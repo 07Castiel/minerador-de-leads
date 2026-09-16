@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase"
+import { supabaseBrowser } from "@/lib/supabase/client"
 import { validateRow } from "@/lib/import/validator"
 import type { ClassifiedRow, NormalizedRow } from "@/lib/import/types"
 
@@ -6,7 +6,7 @@ import type { ClassifiedRow, NormalizedRow } from "@/lib/import/types"
 // maps_url já existentes no banco. Pura/testável — a busca em si (efeito
 // colateral de rede) fica isolada em `classifyRows`, abaixo.
 //
-// Dedupe é exclusivamente por `maps_url` (chave definida no plano) —
+// Dedupe é exclusivamente por `maps_url` dentro da org (chave definida no plano) —
 // latitude/longitude nunca participam dessa decisão. Também pega duplicatas
 // DENTRO do próprio arquivo (mesma maps_url 2x no lote): só a primeira
 // ocorrência segue adiante, as seguintes são marcadas inválidas — evita
@@ -47,7 +47,10 @@ export function classifyRowsWithExisting(
   return classified
 }
 
-export async function classifyRows(rows: NormalizedRow[]): Promise<ClassifiedRow[]> {
+// maps_url é longa e vai na query string: consulta em lotes pequenos.
+const LOTE_CONSULTA_URL = 40
+
+export async function classifyRows(rows: NormalizedRow[], orgId: string): Promise<ClassifiedRow[]> {
   const mapsUrls = Array.from(
     new Set(
       rows
@@ -56,19 +59,18 @@ export async function classifyRows(rows: NormalizedRow[]): Promise<ClassifiedRow
     )
   )
 
-  let existingUrls = new Set<string>()
-  if (mapsUrls.length > 0) {
-    const { data, error } = await supabase
+  const existingUrls = new Set<string>()
+  for (let i = 0; i < mapsUrls.length; i += LOTE_CONSULTA_URL) {
+    const { data, error } = await supabaseBrowser()
       .from("leads")
       .select("maps_url")
-      .in("maps_url", mapsUrls)
+      .eq("org_id", orgId)
+      .in("maps_url", mapsUrls.slice(i, i + LOTE_CONSULTA_URL))
 
     if (error) throw error
-    existingUrls = new Set(
-      (data ?? [])
-        .map((r) => r.maps_url)
-        .filter((url): url is string => typeof url === "string")
-    )
+    for (const row of data) {
+      if (typeof row.maps_url === "string") existingUrls.add(row.maps_url)
+    }
   }
 
   return classifyRowsWithExisting(rows, existingUrls)

@@ -9,6 +9,15 @@ lerna-debug.log*
 
 node_modules
 dist
+.next
+out
+next-env.d.ts
+*.tsbuildinfo
+
+# Supabase CLI
+supabase/.temp
+supabase/.branches
+supabase/.env
 dist-ssr
 *.local
 

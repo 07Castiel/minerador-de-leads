@@ -111,7 +111,9 @@ describe("dedupe com coordenadas diferentes", () => {
       [baseRow(-3.2, -40.2)],
       new Set(["https://maps.example.com/x"])
     )[0]
-    const payload = buildPayload(classified, "teste_origem")
+    const payload = buildPayload(classified, "teste_origem", "org-teste")
+
+    expect(payload.org_id).toBe("org-teste")
 
     for (const field of NEVER_IMPORTED_FIELDS) {
       expect(payload).not.toHaveProperty(field)
