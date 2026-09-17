@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   ganchoDoLead,
+  lacunasDoLead,
   nomeCurto,
   preencherModelo,
   valoresDoModelo,
@@ -23,6 +24,7 @@ const VAZIO: CamposDoModelo = {
   site_dominio_gratuito: null,
   instagram_handle: null,
   perfil_reivindicado: null,
+  fotos_count: null,
   google_rating: null,
   google_avaliacoes_count: null,
 }
@@ -41,6 +43,22 @@ describe("nomeCurto", () => {
     ["BMI Advocacia", "BMI Advocacia"],
     ["Dr. Fernando - Advogado Bancário", "Dr. Fernando"],
     ["Hugo Gondim Advocacia-Especialista", "Hugo Gondim Advocacia-Especialista"],
+    // cortes no início da descrição do serviço
+    ["️ Lomonaco & Gomes Escritorio de Advocacia em Fortaleza | Advogado Criminalista", "Lomonaco & Gomes"],
+    ["Oséas Rodrigues & Nogueira ADVOGADO CRIMINALISTA - ADVOGADO EM SOBRAL", "Oséas Rodrigues & Nogueira"],
+    ["GILSON FONTENELE SOCIEDADE INDIVIDUAL DE ADVOCACIA", "Gilson Fontenele"],
+    ["Igor Gurgel Advogados Associados", "Igor Gurgel"],
+    // nome todo em maiúsculas não tem de onde cortar
+    ["LUIZ CARLOS SILVA ADVOCACIA", "Luiz Carlos Silva Advocacia"],
+    // caixa alta só sai quando vem depois de caixa normal
+    ["Clínica São José LTDA", "Clínica São José"],
+    // emoji em qualquer posição
+    ["Pizzaria 🍕 do Zé", "Pizzaria do Zé"],
+    // corte que deixaria um termo só: fica o nome inteiro
+    ["Mendes Advogados Associados", "Mendes Advogados Associados"],
+    ["FORTALEZA ADVOGADOS ASSOCIADOS", "Fortaleza Advogados Associados"],
+    ["Advocacia BMI", "Advocacia BMI"],
+    ["Nayana", "Nayana"],
   ])("%s → %s", (nome, esperado) => {
     expect(nomeCurto(nome)).toBe(esperado)
   })
@@ -64,6 +82,12 @@ describe("ganchoDoLead", () => {
       })
     ).toBe("vi que o link do perfil abre direto o WhatsApp, sem um site")
     expect(gancho({ tem_site: false, site_url: "https://silva.jusbrasil.com.br" })).toMatch(/outra plataforma/)
+    expect(gancho({ tem_site: false, site_url: "https://linktr.ee/silva" })).toBe(
+      "vi que o link do perfil leva pra uma página de links, não pra um site"
+    )
+    expect(gancho({ tem_site: false, site_url: "https://facebook.com/silva" })).toBe(
+      "vi que o link do perfil leva pra uma rede social, não pra um site"
+    )
   })
 
   it("site com problema, do mais grave ao mais leve", () => {
@@ -83,6 +107,42 @@ describe("ganchoDoLead", () => {
       "vi que o perfil ainda não foi assumido pelo dono"
     )
     expect(gancho({ tem_site: true })).toBe("fiquei curioso pra saber como vocês recebem clientes pela internet hoje")
+  })
+
+  it("depois do perfil sem dono, poucas fotos e poucas avaliações", () => {
+    expect(gancho({ tem_site: true, perfil_reivindicado: false, fotos_count: 1 })).toBe(
+      "vi que o perfil ainda não foi assumido pelo dono"
+    )
+    expect(gancho({ tem_site: true, fotos_count: 4, google_avaliacoes_count: 2 })).toBe(
+      "vi que o perfil de vocês tem poucas fotos"
+    )
+    expect(gancho({ tem_site: true, fotos_count: 5, google_avaliacoes_count: 3 })).toBe(
+      "vi que o perfil de vocês ainda tem poucas avaliações"
+    )
+  })
+})
+
+describe("lacunasDoLead", () => {
+  it("lista todas as lacunas, na ordem do score, com os dados de cada uma", () => {
+    expect(
+      lacunasDoLead({
+        ...VAZIO,
+        tem_site: false,
+        site_url: "https://instagram.com/silva.adv",
+        perfil_reivindicado: false,
+        fotos_count: 2,
+        google_avaliacoes_count: 0,
+      })
+    ).toEqual([
+      { id: "link_fora_do_site", destino: "instagram", url: "https://instagram.com/silva.adv" },
+      { id: "perfil_sem_dono" },
+      { id: "poucas_fotos", fotos: 2 },
+      { id: "pouca_avaliacao", avaliacoes: 0 },
+    ])
+  })
+
+  it("campo desconhecido não vira lacuna", () => {
+    expect(lacunasDoLead(VAZIO)).toEqual([])
   })
 })
 

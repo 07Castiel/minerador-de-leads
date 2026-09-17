@@ -6,7 +6,7 @@ export const FUSO_DA_ABORDAGEM = "America/Fortaleza"
 // Faixas [de, ate) no horário local. Fora delas o botão não gera mensagem.
 // Sem "?" de propósito: a mensagem só pode ter a pergunta do nicho.
 export const SAUDACOES = [
-  { de: "08:00", ate: "12:00", texto: "Oi, bom dia!" },
+  { de: "08:00", ate: "12:00", texto: "Bom dia!" },
   { de: "12:00", ate: "18:00", texto: "Boa tarde!" },
   { de: "18:00", ate: "21:00", texto: "Boa noite!" },
 ] as const
@@ -24,20 +24,14 @@ export const LIMITES = {
   tentativasDoGemini: 2,
 } as const
 
-// Âncora sem pessoa, ou em nicho sem ancoraComPessoa. Sem artigo: "Vi a Igor
-// Gurgel Advogados" e "Vi o Barbearia do Zé" erram o gênero.
-export const ANCORA_PADRAO = "Vi {NEGOCIO} no Google{LOCAL}"
+// Âncora sem pessoa, ou em nicho sem ancoraComPessoa. Verbo de busca ("procurei
+// e achei") em vez de constatação. Sem artigo: "a Igor Gurgel Advogados" e
+// "o Barbearia do Zé" erram o gênero.
+export const ANCORA_PADRAO = "Procurei {NEGOCIO} no Google e achei"
 
-// Onde o negócio fica, dentro da âncora. Sem artigo pelo mesmo motivo ("ali no Aldeota").
-export const LOCAL = {
-  centro: ", ali no Centro",
-  bairro: ", ali no bairro {BAIRRO}",
-  semBairro: "",
-} as const
-
-// Texto usado sem Gemini, quando as tentativas dele são bloqueadas ou falham
-export const MENSAGEM_FIXA =
-  "{SAUDACAO} Sou o Leonardo, de Sobral.\n{ANCORA} — mas {LACUNA}, então {CONSEQUENCIA}.\n{PERGUNTA}"
+// Duas quebras de linha no máximo, sem linha em branco, sem travessão: é assim
+// que se escreve no WhatsApp.
+export const MENSAGEM_FIXA = "{SAUDACAO} Aqui é o Leonardo, de Sobral.\n{ANCORA}, mas {LACUNA}.\n{PERGUNTA}"
 
 // Bloqueiam a mensagem. Comparação sem acento e sem diferença de maiúsculas,
 // a partir do início de uma palavra ("orçamentos" também bloqueia).

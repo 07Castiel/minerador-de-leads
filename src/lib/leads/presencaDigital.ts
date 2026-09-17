@@ -11,21 +11,12 @@ export type LinkClassificado = {
   instagramHandle: string | null
 }
 
-const REDES_SOCIAIS = [
-  "instagram.com",
-  "instagr.am",
-  "facebook.com",
-  "fb.com",
-  "fb.me",
-  "tiktok.com",
-  "youtube.com",
-  "youtu.be",
-  "twitter.com",
-  "x.com",
-  "linkedin.com",
-  "wa.me",
-  "wa.link",
-  "whatsapp.com",
+const INSTAGRAM = ["instagram.com", "instagr.am"]
+
+const WHATSAPP = ["wa.me", "wa.link", "whatsapp.com"]
+
+// "Link na bio": juntam vários links numa página, mas não são um site.
+const PAGINAS_DE_LINKS = [
   "linktr.ee",
   "linkin.bio",
   "bio.link",
@@ -39,7 +30,20 @@ const REDES_SOCIAIS = [
   "solo.to",
 ]
 
-const WHATSAPP = ["wa.me", "wa.link", "whatsapp.com"]
+const REDES_SOCIAIS = [
+  ...INSTAGRAM,
+  "facebook.com",
+  "fb.com",
+  "fb.me",
+  "tiktok.com",
+  "youtube.com",
+  "youtu.be",
+  "twitter.com",
+  "x.com",
+  "linkedin.com",
+  ...WHATSAPP,
+  ...PAGINAS_DE_LINKS,
+]
 
 // Páginas de terceiros (delivery, agendamento, diretórios): o negócio aparece
 // lá, mas não tem um site dele.
@@ -97,7 +101,7 @@ export function hostDe(url: string): string | null {
   }
 }
 
-function pertenceA(host: string, dominios: string[]): boolean {
+export function pertenceA(host: string, dominios: readonly string[]): boolean {
   return dominios.some((d) => host === d || host.endsWith(`.${d}`))
 }
 
@@ -137,9 +141,21 @@ export function temSiteProprio(raw: string | null | undefined): boolean {
   return classificarLink(raw)?.tipo === "site"
 }
 
-export function ehLinkDeWhatsApp(raw: string | null | undefined): boolean {
+function linkDe(raw: string | null | undefined, dominios: readonly string[]): boolean {
   const host = raw ? hostDe(raw.trim()) : null
-  return host !== null && pertenceA(host, WHATSAPP)
+  return host !== null && pertenceA(host, dominios)
+}
+
+export function ehLinkDeWhatsApp(raw: string | null | undefined): boolean {
+  return linkDe(raw, WHATSAPP)
+}
+
+export function ehLinkDoInstagram(raw: string | null | undefined): boolean {
+  return linkDe(raw, INSTAGRAM)
+}
+
+export function ehPaginaDeLinks(raw: string | null | undefined): boolean {
+  return linkDe(raw, PAGINAS_DE_LINKS)
 }
 
 // Nome do construtor quando o site está no endereço gratuito dele; senão null.

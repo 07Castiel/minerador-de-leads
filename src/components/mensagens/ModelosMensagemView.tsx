@@ -48,6 +48,7 @@ const LEAD_DE_EXEMPLO: CamposDoModelo = {
   site_dominio_gratuito: null,
   instagram_handle: "costaemoura.adv",
   perfil_reivindicado: true,
+  fotos_count: 12,
   google_rating: 4.8,
   google_avaliacoes_count: 91,
 }
