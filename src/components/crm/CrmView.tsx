@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { KanbanIcon, ListIcon, PickaxeIcon } from "lucide-react"
 
+import { ExportarLista } from "@/components/crm/ExportarLista"
 import { KanbanBoard } from "@/components/crm/KanbanBoard"
 import { LeadsTable } from "@/components/leads/LeadsTable"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,13 @@ import {
 import { useLeadsDoFunil } from "@/hooks/useLeads"
 import { temSiteComProblema } from "@/lib/leads/motivos"
 import { dataLocalIso, retornoPendente } from "@/lib/leads/proximoContato"
+import {
+  FILTRO_DESCARTADOS,
+  contarSemGancho,
+  leadsDaVisao,
+  paramsDoContador,
+  semGancho,
+} from "@/lib/leads/semGancho"
 import type { Lead } from "@/types/lead"
 
 const TODAS = "__todas__"
@@ -30,6 +38,7 @@ const ATALHOS = [
   { id: "perfil_sem_dono", label: "Perfil Google sem dono" },
   { id: "quente", label: "Quentes" },
   { id: "com_telefone", label: "Com telefone" },
+  { id: FILTRO_DESCARTADOS, label: "Descartados" },
 ] as const
 
 type Atalho = (typeof ATALHOS)[number]["id"]
@@ -103,6 +112,7 @@ export function CrmView() {
       if (atalhos.has("perfil_sem_dono") && lead.perfil_reivindicado !== false) return false
       if (atalhos.has("quente") && lead.temperatura !== "quente") return false
       if (atalhos.has("com_telefone") && !lead.telefone) return false
+      if (atalhos.has(FILTRO_DESCARTADOS) && !semGancho(lead)) return false
       if (categoria && lead.categoria !== categoria) return false
       if (termo) {
         const texto = `${lead.nome} ${lead.bairro ?? ""} ${lead.cidade ?? ""}`.toLowerCase()
@@ -113,13 +123,18 @@ export function CrmView() {
     return ordenar(lista, ordem)
   }, [leads, busca, categoria, ordem, atalhos])
 
+  // O quadro é fila de trabalho: lead sem gancho some dele por padrão, mas fica
+  // contado ao lado, a um clique da lista.
+  const visiveis = useMemo(() => leadsDaVisao(filtrados, visao, atalhos), [filtrados, visao, atalhos])
+  const descartados = useMemo(() => contarSemGancho(filtrados), [filtrados])
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">CRM</h1>
           <p className="text-sm text-muted-foreground">
-            {leads ? `${filtrados.length} de ${leads.length} leads no funil` : "Carregando..."}
+            {leads ? `${visiveis.length} de ${leads.length} leads no funil` : "Carregando..."}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -143,6 +158,7 @@ export function CrmView() {
               Lista
             </Button>
           </div>
+          <ExportarLista leads={leads ?? []} />
           <Button asChild size="sm">
             <Link href="/buscar">
               <PickaxeIcon />
@@ -171,6 +187,17 @@ export function CrmView() {
             {a.label}
           </Button>
         ))}
+        {visao === "quadro" && !atalhos.has(FILTRO_DESCARTADOS) && descartados > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-muted-foreground"
+            title="Leads com site próprio sem defeito: sem gancho automático de abordagem"
+            onClick={() => atualizar(paramsDoContador(atalhos))}
+          >
+            {descartados} descartado{descartados === 1 ? "" : "s"}
+          </Button>
+        )}
         <Select
           value={categoria || TODAS}
           onValueChange={(v) => atualizar({ categoria: v === TODAS ? null : v })}
@@ -213,7 +240,7 @@ export function CrmView() {
         )}
       {leads &&
         leads.length > 0 &&
-        (visao === "lista" ? <LeadsTable leads={filtrados} /> : <KanbanBoard leads={filtrados} />)}
+        (visao === "lista" ? <LeadsTable leads={visiveis} /> : <KanbanBoard leads={visiveis} />)}
     </div>
   )
 }
