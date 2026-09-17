@@ -57,8 +57,21 @@ export type DadosDaAbordagem = {
 
 export type PreparoDaAbordagem =
   | { tipo: "fora_do_horario" }
+  // Site próprio, análise feita e nenhum defeito: fim de linha, não é fila de trabalho
+  | { tipo: "descartado_sem_gancho"; nicho: string }
+  // Falta dado pra decidir (site nunca analisado, link estranho): dá pra voltar
   | { tipo: "manual"; motivo: "sem_lacuna"; nicho: string }
   | { tipo: "pronta"; dados: DadosDaAbordagem }
+
+// Situação derivada, não guardada: se o site cair amanhã, o lead volta a ter
+// gancho sozinho. Gravar isso numa coluna criaria um valor que envelhece.
+// Só vale pra site que abre normalmente: site fora do ar por tempo esgotado ou
+// erro de servidor é medição inconclusiva, e isso é manual, não fim de linha.
+export function descartadoSemGancho(
+  lead: Pick<CamposDaAbordagem, "tem_site" | "site_status" | "site_analisado_em">
+): boolean {
+  return lead.tem_site === true && lead.site_status === "ok" && lead.site_analisado_em !== null
+}
 
 // Sem acento, minúsculas, espaços simples.
 export function normalizar(texto: string): string {
@@ -214,7 +227,11 @@ export function prepararAbordagem(
 
   const nicho = resolverNicho(lead.categoria, termoDaBusca)
   const lacuna = escolherLacuna(lacunasDaAbordagem(lead, nicho), ultimasLacunas)
-  if (!lacuna) return { tipo: "manual", motivo: "sem_lacuna", nicho: nicho.id }
+  if (!lacuna) {
+    return descartadoSemGancho(lead)
+      ? { tipo: "descartado_sem_gancho", nicho: nicho.id }
+      : { tipo: "manual", motivo: "sem_lacuna", nicho: nicho.id }
+  }
 
   return {
     tipo: "pronta",
@@ -354,6 +371,7 @@ export type ModoDaJanela = "completa" | "curta" | "gemini"
 // camada 1 e pela mesma validação; o Gemini só redige o que ela decidiu.
 export type MensagemDaJanela =
   | { tipo: "fora_do_horario" }
+  | { tipo: "descartado_sem_gancho" }
   | { tipo: "manual"; motivo: "sem_lacuna" | "mensagem_fixa_invalida"; bloqueios: TentativaBloqueada[] }
   | {
       tipo: "pronta"
@@ -394,6 +412,7 @@ export async function mensagemParaJanela(
       : leadOriginal
   const preparo = prepararAbordagem(lead, agora, opcoes)
   if (preparo.tipo === "fora_do_horario") return preparo
+  if (preparo.tipo === "descartado_sem_gancho") return { tipo: "descartado_sem_gancho" }
   if (preparo.tipo === "manual") return { tipo: "manual", motivo: preparo.motivo, bloqueios: [] }
 
   const { dados } = preparo

@@ -152,6 +152,7 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
   const carregando = carregar.isPending
   const pronta = base?.tipo === "pronta" ? base : null
   const foraDoHorario = base?.tipo === "fora_do_horario"
+  const descartado = base?.tipo === "descartado_sem_gancho"
   const opcoes: Opcao[] = [
     ...(pronta ? (["completa", "curta"] as const) : []),
     ...(pronta && GEMINI_NA_ABORDAGEM ? (["gemini"] as const) : []),
@@ -174,17 +175,19 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
 
   const descricao = foraDoHorario
     ? "Fora do horário de abordagem."
-    : base?.tipo === "manual" && opcao === ""
-      ? "Sem mensagem automática para este lead."
-      : opcao === "retorno"
-        ? "Confirma se a primeira mensagem chegou."
-        : opcao === "gemini" && origem === "gemini"
-          ? "Redigida pelo Gemini com o mesmo gancho do texto fixo. Revise antes de enviar."
-          : opcao === "gemini" && origem === "fixa"
-            ? "O Gemini não passou na revisão, então veio o texto fixo. Revise antes de enviar."
-            : base
-              ? "Texto fixo, decidido pelo sistema para este lead. Revise antes de enviar."
-              : "Montando a mensagem..."
+    : descartado && opcao === ""
+      ? "Nada a apontar neste lead."
+      : base?.tipo === "manual" && opcao === ""
+        ? "Sem mensagem automática para este lead."
+        : opcao === "retorno"
+          ? "Confirma se a primeira mensagem chegou."
+          : opcao === "gemini" && origem === "gemini"
+            ? "Redigida pelo Gemini com o mesmo gancho do texto fixo. Revise antes de enviar."
+            : opcao === "gemini" && origem === "fixa"
+              ? "O Gemini não passou na revisão, então veio o texto fixo. Revise antes de enviar."
+              : base
+                ? "Texto fixo, decidido pelo sistema para este lead. Revise antes de enviar."
+                : "Montando a mensagem..."
 
   return (
     <>
@@ -208,6 +211,13 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
           {foraDoHorario && (
             <p className="rounded-md border bg-muted/50 p-3 text-sm">
               As mensagens só saem entre {JANELA_DE_HORARIO}, no horário de Fortaleza. Volte nesse horário.
+            </p>
+          )}
+
+          {descartado && (
+            <p className="rounded-md border bg-muted/50 p-3 text-sm">
+              O site de vocês abre e não tem defeito que dê pra apontar, então não há gancho automático. Este lead é
+              fim de linha na abordagem, não fila de trabalho.
             </p>
           )}
 
@@ -259,7 +269,7 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
           )}
           {carregar.isError && <p className="text-sm text-destructive">{carregar.error.message}</p>}
 
-          {!foraDoHorario && (base || carregar.isError) && (
+          {!foraDoHorario && (base || carregar.isError) && (opcoes.length > 0 || base?.tipo === "manual" || carregar.isError) && (
             <DialogFooter>
               {opcao === "gemini" && (
                 <Button variant="outline" disabled={carregando} onClick={() => pedir("gemini", geradas)}>

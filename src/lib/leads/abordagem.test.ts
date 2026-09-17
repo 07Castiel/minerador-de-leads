@@ -292,12 +292,8 @@ describe("lacunas", () => {
     })
 
     it("sem https e lento no celular ficam de fora", () => {
-      expect(preparar({ ...COM_SITE, site_https: false }).tipo).toBe("manual")
-      expect(preparar({ ...COM_SITE, site_nota_celular: 12 }).tipo).toBe("manual")
-    })
-
-    it("site que abre e não tem defeito: manual", () => {
-      expect(preparar(COM_SITE).tipo).toBe("manual")
+      expect(preparar({ ...COM_SITE, site_https: false }).tipo).toBe("descartado_sem_gancho")
+      expect(preparar({ ...COM_SITE, site_nota_celular: 12 }).tipo).toBe("descartado_sem_gancho")
     })
   })
 
@@ -312,8 +308,8 @@ describe("lacunas", () => {
   })
 
   it("3: 5 fotos ou foto desconhecida não é lacuna", () => {
-    expect(preparar({ ...COMERCIO, fotos_count: 5 }).tipo).toBe("manual")
-    expect(preparar({ ...COMERCIO, fotos_count: null }).tipo).toBe("manual")
+    expect(preparar({ ...COMERCIO, fotos_count: 5 }).tipo).toBe("descartado_sem_gancho")
+    expect(preparar({ ...COMERCIO, fotos_count: null }).tipo).toBe("descartado_sem_gancho")
   })
 
   it("5 (comércio): pouca avaliação, e zero não vira 'quase não tem'", () => {
@@ -324,24 +320,40 @@ describe("lacunas", () => {
   })
 
   it("5: 4 avaliações ou contagem desconhecida não é lacuna", () => {
-    expect(preparar({ ...COMERCIO, google_avaliacoes_count: 4 }).tipo).toBe("manual")
-    expect(preparar({ ...COMERCIO, google_avaliacoes_count: null }).tipo).toBe("manual")
+    expect(preparar({ ...COMERCIO, google_avaliacoes_count: 4 }).tipo).toBe("descartado_sem_gancho")
+    expect(preparar({ ...COMERCIO, google_avaliacoes_count: null }).tipo).toBe("descartado_sem_gancho")
   })
 
-  it("3 e 5 só em comércio: advocacia e outros com poucas fotos e avaliações ficam manuais", () => {
-    expect(preparar({ fotos_count: 1, google_avaliacoes_count: 0 })).toMatchObject({ tipo: "manual" })
+  it("3 e 5 só em comércio: advocacia e outros com poucas fotos e avaliações não viram lacuna", () => {
+    expect(preparar({ fotos_count: 1, google_avaliacoes_count: 0 })).toMatchObject({ tipo: "descartado_sem_gancho" })
     expect(preparar({ categoria: "Contador", fotos_count: 1, google_avaliacoes_count: 0 })).toMatchObject({
-      tipo: "manual",
+      tipo: "descartado_sem_gancho",
       nicho: "outros",
     })
   })
 
   it("horário desconhecido não vira lacuna (lacuna 2 desligada)", () => {
-    expect(preparar({}).tipo).toBe("manual")
+    expect(preparar({}).tipo).toBe("descartado_sem_gancho")
+  })
+})
+
+describe("descartado_sem_gancho x manual", () => {
+  const COM_SITE = { tem_site: true, site_url: "https://silva.adv.br" } as const
+
+  it("site que abre, analisado e sem defeito: fim de linha", () => {
+    expect(preparar({ ...COM_SITE, site_status: "ok" })).toEqual({
+      tipo: "descartado_sem_gancho",
+      nicho: "advocacia",
+    })
   })
 
-  it("sem nenhuma lacuna: abordagem manual, sem chamar o Gemini", () => {
-    expect(preparar({})).toEqual({ tipo: "manual", motivo: "sem_lacuna", nicho: "advocacia" })
+  it.each([
+    ["site fora do ar sem ser DNS (medição inconclusiva)", { site_status: "fora_do_ar" as const, site_falha: "TIMEOUT" }],
+    ["site nunca analisado", { site_status: null, site_analisado_em: null }],
+    ["link que não é site próprio nem rede social", { tem_site: false, site_url: "https://silva.business.site" }],
+    ["sem saber se tem site", { tem_site: null, site_url: null, site_status: null }],
+  ])("%s: continua manual", (_, lead) => {
+    expect(preparar({ ...COM_SITE, ...lead })).toMatchObject({ tipo: "manual", motivo: "sem_lacuna" })
   })
 })
 
@@ -763,9 +775,11 @@ describe("mensagemParaJanela", () => {
     expect(redigir).not.toHaveBeenCalled()
   })
 
-  it("lead manual (sem lacuna) não oferece geração nem chama o Gemini", async () => {
+  it("lead descartado ou manual não oferece geração nem chama o Gemini", async () => {
     const redigir = vi.fn()
-    expect(await mensagemParaJanela(OK, MANHA, "gemini", {}, redigir)).toEqual({
+    expect(await mensagemParaJanela(OK, MANHA, "gemini", {}, redigir)).toEqual({ tipo: "descartado_sem_gancho" })
+    const inconclusivo = { ...OK, site_status: "fora_do_ar" as const, site_falha: "TIMEOUT" }
+    expect(await mensagemParaJanela(inconclusivo, MANHA, "gemini", {}, redigir)).toEqual({
       tipo: "manual",
       motivo: "sem_lacuna",
       bloqueios: [],
@@ -880,9 +894,7 @@ describe("reverificação do site", () => {
       site_falha: null,
     })
     expect(await mensagemParaJanela(caido, MANHA, "completa", {}, undefined, reverificar)).toEqual({
-      tipo: "manual",
-      motivo: "sem_lacuna",
-      bloqueios: [],
+      tipo: "descartado_sem_gancho",
     })
   })
 
@@ -984,7 +996,10 @@ describe("os 100 leads reais", () => {
       site_dominio_inexistente: 5,
       site_certificado_invalido: 2,
       site_dominio_gratuito: 2,
-      manual: 42,
+      // site que abre e não tem defeito: fim de linha
+      descartado_sem_gancho: 40,
+      // os 2 sites que responderam 404 e 500: medição inconclusiva, dá pra rever
+      manual: 2,
     })
   })
 })
