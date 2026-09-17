@@ -77,9 +77,14 @@ export const TERMOS_BLOQUEADOS = {
   ],
   // Promessa de resultado
   promessa: ["trazer cliente", "mais clientes", "novos clientes", "aumentar", "vai vender mais", "costuma trazer"],
-  // Elogio. "top" por início de palavra também pega "topo" e "tópico".
+  // Elogio
   elogio: ["excelente atendimento", "parabéns", "incrível", "adorei", "top"],
 } as const satisfies Record<string, readonly string[]>
+
+// Termos comparados como palavra inteira, não por início: por início eles pegam
+// palavra inocente e bloqueiam em silêncio ("top" → "no topo do Google",
+// "monto" → "montou", "te mando" → "te mandou", "te mostro" → "te mostrou").
+export const TERMOS_DE_PALAVRA_INTEIRA: readonly string[] = ["top", "monto", "te mando", "te mostro"]
 
 // Só num nicho. Advocacia: agendamento e avaliação de cliente como argumento
 // soam como captação de clientela, que o código de ética da OAB restringe.

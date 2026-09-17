@@ -21,6 +21,7 @@ import {
   SAUDACOES,
   TERMOS_BLOQUEADOS,
   TERMOS_BLOQUEADOS_POR_NICHO,
+  TERMOS_DE_PALAVRA_INTEIRA,
   TEXTOS_CURTOS_DAS_LACUNAS,
   TEXTOS_DAS_LACUNAS,
   type LacunaDaAbordagem,
@@ -238,9 +239,11 @@ export function mensagemDeRetorno(): string {
 }
 
 // Termo no início de palavra: "orçamentos" bloqueia, "meu crio" não conta como "eu crio".
+// Os de TERMOS_DE_PALAVRA_INTEIRA também precisam terminar a palavra.
 function contemTermo(textoNormalizado: string, termo: string): boolean {
   const alvo = normalizar(termo).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  return new RegExp(`(?<![\\p{L}\\p{N}])${alvo}`, "u").test(textoNormalizado)
+  const fim = TERMOS_DE_PALAVRA_INTEIRA.includes(termo) ? "(?![\\p{L}\\p{N}])" : ""
+  return new RegExp(`(?<![\\p{L}\\p{N}])${alvo}${fim}`, "u").test(textoNormalizado)
 }
 
 // Também unifica acento decomposto: o Gemini devolve "ã" composto mesmo se o banco não.
@@ -335,4 +338,81 @@ export async function redigirAbordagem(dados: DadosDaAbordagem, redigir: Redator
     }
   }
   return { tipo: "pronta", texto: fixa, origem: "fixa", bloqueios }
+}
+
+export type ModoDaJanela = "completa" | "curta" | "gemini"
+
+// O que a janela do WhatsApp recebe. Texto fixo e Gemini passam pela mesma
+// camada 1 e pela mesma validação; o Gemini só redige o que ela decidiu.
+export type MensagemDaJanela =
+  | { tipo: "fora_do_horario" }
+  | { tipo: "manual"; motivo: "sem_lacuna" | "mensagem_fixa_invalida"; bloqueios: TentativaBloqueada[] }
+  | {
+      tipo: "pronta"
+      lacuna: LacunaDaAbordagem
+      texto: string
+      origem: "gemini" | "fixa"
+      bloqueios: TentativaBloqueada[]
+      // Pra validar de novo se o texto for editado na janela
+      validacao: Pick<DadosDaAbordagem, "referencia" | "pergunta" | "nicho">
+    }
+
+export async function mensagemParaJanela(
+  lead: CamposDaAbordagem,
+  agora: Date,
+  modo: ModoDaJanela,
+  opcoes: OpcoesDaAbordagem = {},
+  redigir?: Redator
+): Promise<MensagemDaJanela> {
+  const preparo = prepararAbordagem(lead, agora, opcoes)
+  if (preparo.tipo === "fora_do_horario") return preparo
+  if (preparo.tipo === "manual") return { tipo: "manual", motivo: preparo.motivo, bloqueios: [] }
+
+  const { dados } = preparo
+  const comum = {
+    lacuna: dados.lacuna,
+    validacao: { referencia: dados.referencia, pergunta: dados.pergunta, nicho: dados.nicho },
+  }
+
+  if (modo === "gemini") {
+    if (!redigir) throw new Error("Modo gemini sem redator.")
+    const redacao = await redigirAbordagem(dados, redigir)
+    return redacao.tipo === "manual" ? redacao : { ...redacao, ...comum }
+  }
+
+  const texto = mensagemFixa(dados, modo)
+  const motivos = validarMensagem(texto, dados)
+  if (motivos.length > 0) {
+    return { tipo: "manual", motivo: "mensagem_fixa_invalida", bloqueios: [{ tentativa: "fixa", motivos }] }
+  }
+  return { tipo: "pronta", texto, origem: "fixa", bloqueios: [], ...comum }
+}
+
+const NOMES_DOS_GRUPOS: Record<string, string> = {
+  oferta: "oferta",
+  permissao: "pedido de permissão",
+  promessa: "promessa de resultado",
+  elogio: "elogio",
+  advocacia: "termo vedado na advocacia",
+}
+
+const NOMES_DOS_MOTIVOS: Record<string, string> = {
+  vazia: "mensagem vazia",
+  mais_de_uma_pergunta: "mais de uma pergunta",
+  [`passa_de_${LIMITES.caracteres}_caracteres`]: `passa de ${LIMITES.caracteres} caracteres`,
+  emoji: "emoji",
+  markdown: "formatação (asterisco, sublinhado, lista)",
+  sem_nome_do_negocio: "sem o nome do lead",
+  sem_pergunta_do_nicho: "a pergunta final mudou",
+  [`marca_de_ia:mais_de_${LIMITES_DE_LINHA.quebras}_quebras`]: `mais de ${LIMITES_DE_LINHA.quebras} quebras de linha`,
+  "marca_de_ia:linha_em_branco": "linha em branco",
+}
+
+// "permissao:te mando" → 'pedido de permissão ("te mando")', pra mostrar na janela.
+export function descreverMotivo(motivo: string): string {
+  if (NOMES_DOS_MOTIVOS[motivo]) return NOMES_DOS_MOTIVOS[motivo]
+  const [grupo, ...resto] = motivo.split(":")
+  const detalhe = resto.join(":")
+  if (grupo === "marca_de_ia") return detalhe
+  return NOMES_DOS_GRUPOS[grupo] ? `${NOMES_DOS_GRUPOS[grupo]} ("${detalhe}")` : motivo
 }

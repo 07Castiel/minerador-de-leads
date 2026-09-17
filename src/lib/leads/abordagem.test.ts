@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest"
 
 import {
+  descreverMotivo,
   escolherLacuna,
   mensagemDeRetorno,
   mensagemFixa,
+  mensagemParaJanela,
   prepararAbordagem,
   redigirAbordagem,
   resolverNicho,
@@ -19,6 +21,7 @@ import {
   NICHO_PADRAO,
   TERMOS_BLOQUEADOS,
   TERMOS_BLOQUEADOS_POR_NICHO,
+  TERMOS_DE_PALAVRA_INTEIRA,
 } from "@/lib/leads/abordagemConfig"
 import leadsReais from "@/lib/leads/fixtures/leads-reais.json"
 
@@ -514,6 +517,42 @@ describe("validarMensagem", () => {
     expect(validarMensagem(comTrecho("Desmonto tudo."), d)).toEqual([])
   })
 
+  describe("termos curtos só bloqueiam como palavra inteira (sem falso positivo silencioso)", () => {
+    it.each([
+      ["Vocês aparecem no topo do Google.", "top"],
+      ["Vi um tópico sobre isso.", "top"],
+      ["Ele montou o escritório sozinho.", "monto"],
+      ["Alguém te mandou o link.", "te mando"],
+      ["O Google te mostrou o perfil.", "te mostro"],
+    ])("%s", (frase) => {
+      expect(validarMensagem(comTrecho(frase), d)).toEqual([])
+    })
+
+    it("mas continuam bloqueando a palavra em si", () => {
+      expect(validarMensagem(comTrecho("Perfil top."), d)).toContain("elogio:top")
+      expect(validarMensagem(comTrecho("Monto rapidinho."), d)).toContain("oferta:monto")
+      expect(validarMensagem(comTrecho("Te mando depois."), d)).toContain("permissao:te mando")
+      expect(validarMensagem(comTrecho("Te mostro depois."), d)).toContain("permissao:te mostro")
+    })
+
+    it("são exatamente estes quatro", () => {
+      expect(TERMOS_DE_PALAVRA_INTEIRA).toEqual(["top", "monto", "te mando", "te mostro"])
+    })
+
+    it("os outros termos continuam por início de palavra", () => {
+      expect(validarMensagem(comTrecho("Mando uns orcamentos."), d)).toContain("oferta:orçamento")
+      expect(validarMensagem(comTrecho("Isso aumentaria a procura."), d)).toContain("promessa:aumentar")
+    })
+  })
+
+  it("descreverMotivo deixa o motivo legível na janela", () => {
+    expect(descreverMotivo("permissao:te mando")).toBe('pedido de permissão ("te mando")')
+    expect(descreverMotivo("marca_de_ia:travessão")).toBe("travessão")
+    expect(descreverMotivo("marca_de_ia:mais_de_2_quebras")).toBe("mais de 2 quebras de linha")
+    expect(descreverMotivo("sem_pergunta_do_nicho")).toBe("a pergunta final mudou")
+    expect(descreverMotivo("advocacia:agendamento")).toBe('termo vedado na advocacia ("agendamento")')
+  })
+
   it("(e) vale só na advocacia", () => {
     expect(validarConteudo("Facilita o agendamento.", "advocacia")).toEqual(["advocacia:agendamento"])
     expect(validarConteudo("Facilita o agendamento.", "agendamento")).toEqual([])
@@ -647,6 +686,96 @@ describe("redigirAbordagem", () => {
     const r = await redigirAbordagem(longo, vi.fn().mockResolvedValue(invalida))
     expect(r).toMatchObject({ tipo: "manual", motivo: "mensagem_fixa_invalida" })
     expect(r.bloqueios.at(-1)).toEqual({ tentativa: "fixa", motivos: ["passa_de_400_caracteres"] })
+  })
+})
+
+describe("mensagemParaJanela", () => {
+  const LUIZ = { ...OK, ...SEM_LINK, nome: "LUIZ CARLOS SILVA ADVOCACIA", bairro: "Centro", cidade: "Sobral" }
+  const ouro = mensagemFixa(dados(LUIZ))
+  const validacao = {
+    referencia: "Luiz Carlos",
+    pergunta: "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?",
+    nicho: "advocacia",
+  }
+
+  it("fora do horário bloqueia, em qualquer modo, sem chamar o Gemini", async () => {
+    const redigir = vi.fn()
+    const noite = new Date("2026-09-18T00:30:00Z") // 21:30
+    for (const modo of ["completa", "curta", "gemini"] as const) {
+      expect(await mensagemParaJanela(LUIZ, noite, modo, {}, redigir)).toEqual({ tipo: "fora_do_horario" })
+    }
+    expect(redigir).not.toHaveBeenCalled()
+  })
+
+  it("lead manual (sem lacuna) não oferece geração nem chama o Gemini", async () => {
+    const redigir = vi.fn()
+    expect(await mensagemParaJanela(OK, MANHA, "gemini", {}, redigir)).toEqual({
+      tipo: "manual",
+      motivo: "sem_lacuna",
+      bloqueios: [],
+    })
+    expect(redigir).not.toHaveBeenCalled()
+  })
+
+  it("texto fixo e curto saem prontos, com o que a janela precisa pra validar edição", async () => {
+    expect(await mensagemParaJanela(LUIZ, MANHA, "completa")).toEqual({
+      tipo: "pronta",
+      lacuna: "sem_site",
+      texto: ouro,
+      origem: "fixa",
+      bloqueios: [],
+      validacao,
+    })
+    expect(await mensagemParaJanela(LUIZ, MANHA, "curta")).toMatchObject({ texto: mensagemFixa(dados(LUIZ), "curta") })
+  })
+
+  it("Gemini que respeita a estrutura: origem gemini", async () => {
+    const redacao = ouro.replace("Procurei o escritório", "Procurei aqui o escritório")
+    const r = await mensagemParaJanela(LUIZ, MANHA, "gemini", {}, vi.fn().mockResolvedValue(redacao))
+    expect(r).toMatchObject({ tipo: "pronta", texto: redacao, origem: "gemini", bloqueios: [], validacao })
+  })
+
+  it("Gemini devolvendo a fixture 4: bloqueado, retry, texto fixo com os motivos", async () => {
+    const redigir = vi.fn().mockResolvedValue(FIXTURE_4)
+    const r = await mensagemParaJanela(LUIZ, MANHA, "gemini", {}, redigir)
+    expect(redigir).toHaveBeenCalledTimes(2)
+    expect(r).toMatchObject({ tipo: "pronta", texto: ouro, origem: "fixa" })
+    if (r.tipo !== "pronta") throw new Error("esperava pronta")
+    expect(r.bloqueios.map((b) => b.tentativa)).toEqual([1, 2])
+    expect(r.bloqueios[0].motivos).toContain("advocacia:avalia super bem")
+  })
+
+  it("Gemini com a mensagem certa mas a pergunta reescrita: bloqueado por 'sem a pergunta do nicho'", async () => {
+    const reescrita = ouro.replace(
+      "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?",
+      "Quem procura vocês por lá vai direto pro WhatsApp ou vê alguma página antes?"
+    )
+    const r = await mensagemParaJanela(LUIZ, MANHA, "gemini", {}, vi.fn().mockResolvedValue(reescrita))
+    expect(r).toMatchObject({ origem: "fixa", texto: ouro })
+    if (r.tipo !== "pronta") throw new Error("esperava pronta")
+    expect(r.bloqueios).toEqual([
+      { tentativa: 1, motivos: ["sem_pergunta_do_nicho"] },
+      { tentativa: 2, motivos: ["sem_pergunta_do_nicho"] },
+    ])
+  })
+
+  it("Gemini com travessão: bloqueado por marca de IA", async () => {
+    const comTravessao = ouro.replace("e achei, mas", "e achei — mas")
+    const r = await mensagemParaJanela(LUIZ, MANHA, "gemini", {}, vi.fn().mockResolvedValue(comTravessao))
+    if (r.tipo !== "pronta") throw new Error("esperava pronta")
+    expect(r.origem).toBe("fixa")
+    expect(r.bloqueios[0]).toEqual({ tentativa: 1, motivos: ["marca_de_ia:travessão"] })
+  })
+
+  it("Gemini falhando duas vezes (API): texto fixo, sem erro, com o motivo", async () => {
+    const r = await mensagemParaJanela(LUIZ, MANHA, "gemini", {}, vi.fn().mockRejectedValue(new Error("429 limite")))
+    expect(r).toMatchObject({ tipo: "pronta", texto: ouro, origem: "fixa" })
+    if (r.tipo !== "pronta") throw new Error("esperava pronta")
+    expect(r.bloqueios.map((b) => b.motivos)).toEqual([["erro: 429 limite"], ["erro: 429 limite"]])
+  })
+
+  it("modo gemini sem redator é erro de programação", async () => {
+    await expect(mensagemParaJanela(LUIZ, MANHA, "gemini")).rejects.toThrow("sem redator")
   })
 })
 

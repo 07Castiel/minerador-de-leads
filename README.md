@@ -32,12 +32,14 @@ Variáveis em `.env.local` (modelo em `.env.example`).
   envie ao CRM, exporte CSV ou analise os sites dos resultados visíveis.
 - **Lead** (`/leads/:id`): dados, ligar/WhatsApp, etapa, motivo de perda,
   próximo contato, observações e análise do site.
-- **WhatsApp** (no card do CRM, na lista Hoje e no lead): escolhe um modelo
-  pronto (instantâneo) ou pede ao Gemini; dá pra editar e abrir o WhatsApp com o
-  texto. Depois de abrir, um aviso oferece marcar o lead como abordado e o
-  retorno em 3 dias.
-- **Mensagens** (`/mensagens`): cria e edita os modelos, com as variáveis e uma
-  prévia com um lead de verdade.
+- **WhatsApp** (no card do CRM, na lista Hoje e no lead): mostra a mensagem que o
+  sistema decidiu pro lead, em texto fixo, versão curta ou redigida pelo Gemini,
+  e o retorno para quem já foi abordado. Dá pra editar, mas o texto editado passa
+  pela mesma validação. Fora do horário (antes das 08:00 ou a partir das 21:00,
+  horário de Fortaleza) e lead sem lacuna não geram mensagem. Depois de abrir, um
+  aviso oferece marcar o lead como abordado e o retorno em 3 dias.
+- **Mensagens** (`/mensagens`): cria e edita modelos com variáveis, com prévia
+  num lead de verdade. A janela do WhatsApp não usa mais esses modelos.
 - **Importar** (`/importar`): upload manual de export do Apify (CSV/JSON).
 
 ## Como funciona
@@ -82,6 +84,8 @@ As migrations em `supabase/migrations/` já estão aplicadas:
   Jusfy) como sem site.
 - `20260917120200_modelos_de_mensagem.sql`: tabela `modelos_mensagem` com RLS e
   três modelos iniciais para toda conta (inclusive as novas, por gatilho).
+- `20260918120000_modelos_padrao_saem_do_banco.sql`: tira os três modelos
+  iniciais e o gatilho; esses textos passam a ser gerados em código.
 
 **Score (0 a 100), calculado por gatilho a cada gravação em `leads`:**
 
@@ -141,8 +145,9 @@ quem usa o app.
 `{gancho}`, `{categoria}`, `{bairro}`, `{cidade}`, `{nota}` e `{avaliacoes}`,
 preenchido no navegador por `src/lib/leads/modelosMensagem.ts`. `{nome}` corta o
 que vem depois de " - " ou "|" no nome do Google. `{gancho}` completa "Encontrei
-vocês no Google e ..." com o ponto mais fraco do lead, na ordem do score (sem
-site, só Instagram, site fora do ar, lento no celular, perfil sem dono...).
+vocês no Google e ..." com a primeira lacuna do lead (`lacunasDoLead`, a mesma
+lista da abordagem), na ordem do score (sem site, só Instagram, site fora do ar,
+lento no celular, perfil sem dono...).
 Variável sem dado fica em branco e a janela avisa.
 
 **Sinais do perfil:** reivindicação e número de fotos vêm grátis na busca.
@@ -158,18 +163,25 @@ Tipos: `npx supabase gen types typescript --project-id iypipenavdztjqkcgwgc > sr
 gatilho cria a organização automaticamente, com o nome vindo do e-mail. Para
 renomear: `update public.organizacoes set nome = 'Núcleo Tech';`
 
-**Mensagem de WhatsApp.** `POST /api/leads/:id/mensagem-whatsapp` lê o lead
-com a sessão do usuário (RLS) e chama o Gemini (`gemini-3.5-flash`, plano
-gratuito do Google AI Studio) em `src/lib/gemini.ts`. Quando ele está
-sobrecarregado ou no limite, tenta o `gemini-3.8-flash`. As instruções, o que é
-oferecido (`OFERTA`) e a montagem dos dados ficam em
-`src/lib/leads/mensagemWhatsApp.ts`, com testes. Só vão para o modelo os campos
-preenchidos, e o prompt pede para não repetir números como nota ou seguidores.
-As observações do lead **não** são enviadas: no plano gratuito o Google pode
-usar o conteúdo para melhorar os produtos dele. Cada pedido sorteia uma sugestão
-de abertura e de fechamento para as mensagens não saírem todas iguais, e "Gerar
-outra" manda as versões já vistas para o modelo fugir delas. Precisa de
-`GEMINI_API_KEY`.
+**Mensagem de WhatsApp.** `POST /api/leads/:id/mensagem-whatsapp` com
+`{ modo: "completa" | "curta" | "gemini" }`, em três camadas
+(`src/lib/leads/abordagem.ts`, textos e limites em `src/lib/leads/config/`):
+1. O código decide tudo: horário (America/Fortaleza), nicho (categoria do
+   Google; termo da busca só se a categoria for genérica), lacuna (sem site ou
+   link fora do site; poucas fotos e pouca avaliação só em comércio), âncora
+   com a pessoa do nome quando dá pra afirmar, e a pergunta final.
+2. O texto sai fixo, na estrutura de 3 linhas, ou o Gemini redige
+   (`src/lib/gemini.ts`, prompt em `src/lib/leads/mensagemWhatsApp.ts`). O
+   Gemini só recebe saudação, âncora, lacuna, pergunta e tratamento, nunca os
+   dados do lead. Primeira tentativa no `gemini-3.5-flash`, retry no
+   `gemini-3.8-flash`, temperatura 1.0.
+3. `validarMensagem` bloqueia marcas de IA, oferta, pedido de permissão,
+   promessa, elogio, termos vedados na advocacia, mais de uma pergunta, texto
+   sem o nome ou sem a pergunta decidida. Gemini bloqueado duas vezes vira o
+   texto fixo, e o motivo vai pro log do servidor.
+
+Os testes usam as mensagens reais do fluxo antigo e os 100 leads reais
+(`src/lib/leads/fixtures/leads-reais.json`). Precisa de `GEMINI_API_KEY`.
 
 ## Deploy (Vercel)
 

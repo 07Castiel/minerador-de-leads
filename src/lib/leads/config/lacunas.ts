@@ -58,7 +58,7 @@ export const TEXTOS_CURTOS_DAS_LACUNAS = {
     redeSocialSemNome: "o link só vai pra uma rede social",
     pagina: "o link só vai pro {DESTINO}",
     paginaDeLinksSemNome: "o link só vai pra uma página de links",
-    plataformaSemNome: "o link só vai pra outro site",
+    plataformaSemNome: "o link não vai pra um site de vocês",
   },
   poucas_fotos: {
     nenhuma: "não tem foto no perfil",

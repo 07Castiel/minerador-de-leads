@@ -1,9 +1,8 @@
 "use client"
 
 import { useId, useRef, useState } from "react"
-import Link from "next/link"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Loader2Icon, MessageCircleIcon, PencilIcon, RefreshCwIcon } from "lucide-react"
+import { useMutation } from "@tanstack/react-query"
+import { Loader2Icon, MessageCircleIcon, RefreshCwIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -25,10 +24,17 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useAgendarRetorno } from "@/hooks/useLeads"
-import { consultaDosModelos, useModelosMensagem, type ModeloMensagem } from "@/hooks/useModelosMensagem"
 import { linkWhatsApp } from "@/lib/contato"
-import { pedirMensagemWhatsApp } from "@/lib/leads/api"
-import { preencherModelo, valoresDoModelo, type ModeloPreenchido } from "@/lib/leads/modelosMensagem"
+import {
+  descreverMotivo,
+  mensagemDeRetorno,
+  validarConteudo,
+  validarMensagem,
+  type MensagemDaJanela,
+  type ModoDaJanela,
+} from "@/lib/leads/abordagem"
+import { SAUDACOES } from "@/lib/leads/abordagemConfig"
+import { pedirMensagemDaJanela } from "@/lib/leads/api"
 import { dataLocalIso, descreverRetorno, retornoPendente, somarDias } from "@/lib/leads/proximoContato"
 import type { Lead } from "@/types/lead"
 
@@ -37,95 +43,84 @@ type BotaoWhatsAppProps = {
   size: "xs" | "sm"
 }
 
-const GEMINI = "__gemini__"
+type Opcao = ModoDaJanela | "retorno"
+
+const ROTULOS: Record<Opcao, string> = {
+  completa: "Texto fixo",
+  curta: "Texto fixo curto",
+  gemini: "Escrito pelo Gemini",
+  retorno: "Retorno (confirmar se chegou)",
+}
+
 const DIAS_ATE_O_RETORNO = 3
-// Guarda a última escolha (modelo ou Gemini) só neste navegador.
-const CHAVE_ULTIMA_ESCOLHA = "whatsapp:ultima-escolha"
+const JANELA_DE_HORARIO = `${SAUDACOES[0].de} e ${SAUDACOES[SAUDACOES.length - 1].ate}`
 
-function lerUltimaEscolha(): string | null {
-  try {
-    return localStorage.getItem(CHAVE_ULTIMA_ESCOLHA)
-  } catch {
-    return null
-  }
-}
-
-function guardarUltimaEscolha(escolha: string) {
-  try {
-    localStorage.setItem(CHAVE_ULTIMA_ESCOLHA, escolha)
-  } catch {
-    // navegador sem storage: só não lembra
-  }
-}
-
-// O clique abre um diálogo com a mensagem pronta: um modelo preenchido com os
-// dados do lead (instantâneo) ou escrita pelo Gemini. Dá pra editar e abrir o
-// WhatsApp com o texto; depois, um aviso oferece marcar o retorno.
+// O clique abre a janela com a mensagem que o sistema decidiu pra este lead:
+// texto fixo, a versão curta, ou a mesma coisa redigida pelo Gemini. Tudo passa
+// pela mesma validação, inclusive o que for editado aqui. Fora do horário ou sem
+// lacuna, não há mensagem.
 export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
   const idDoSeletor = useId()
   const [aberto, setAberto] = useState(false)
-  // id do modelo, GEMINI, ou "" enquanto os modelos carregam
-  const [escolha, setEscolha] = useState("")
-  const escolhaAtual = useRef("")
+  // Primeira resposta da abertura: diz se tem mensagem e com que regras validar
+  const [base, setBase] = useState<MensagemDaJanela | null>(null)
+  const [opcao, setOpcao] = useState<Opcao | "">("")
+  const opcaoAtual = useRef<Opcao | "">("")
   const [mensagem, setMensagem] = useState("")
-  const [preenchido, setPreenchido] = useState<ModeloPreenchido | null>(null)
+  const [origem, setOrigem] = useState<"gemini" | "fixa" | null>(null)
   const [geradas, setGeradas] = useState<string[]>([])
-  const queryClient = useQueryClient()
-  const modelos = useModelosMensagem()
   const agendar = useAgendarRetorno()
-  const gerar = useMutation({
-    mutationFn: (descartadas: string[]) => pedirMensagemWhatsApp(lead.id, descartadas),
+  const carregar = useMutation({
+    mutationFn: ({ modo, descartadas }: { modo: ModoDaJanela; descartadas: string[] }) =>
+      pedirMensagemDaJanela(lead.id, modo, descartadas),
   })
 
-  function pedir(descartadas: string[]) {
+  function pedir(modo: ModoDaJanela, descartadas: string[]) {
     // Callbacks no mutate só valem para o último pedido: resposta atrasada de
     // uma abertura anterior não sobrescreve a atual.
-    gerar.mutate(descartadas, {
-      onSuccess: (texto) => {
-        // Trocou para um modelo enquanto o Gemini escrevia: ignora a resposta.
-        if (escolhaAtual.current !== GEMINI) return
-        setMensagem(texto)
-        setGeradas([...descartadas, texto])
-      },
-    })
+    carregar.mutate(
+      { modo, descartadas },
+      {
+        onSuccess: (resposta) => {
+          if (resposta.tipo !== "pronta") {
+            // Passou das 21h ou o lead mudou entre um pedido e outro
+            setBase(resposta)
+            setOpcao("")
+            opcaoAtual.current = ""
+            setMensagem("")
+            return
+          }
+          setBase(resposta)
+          // Trocou de opção enquanto esperava: só guarda a base
+          if (opcaoAtual.current !== modo) return
+          setMensagem(resposta.texto)
+          setOrigem(resposta.origem)
+          if (modo === "gemini" && resposta.origem === "gemini") setGeradas([...descartadas, resposta.texto])
+        },
+      }
+    )
   }
 
-  function escolher(valor: string, lista: ModeloMensagem[]) {
-    setEscolha(valor)
-    escolhaAtual.current = valor
-    if (valor === "") return
-    guardarUltimaEscolha(valor)
-
-    if (valor === GEMINI) {
-      setPreenchido(null)
-      setMensagem("")
-      setGeradas([])
-      pedir([])
+  function escolher(valor: Opcao) {
+    setOpcao(valor)
+    opcaoAtual.current = valor
+    setMensagem("")
+    setOrigem(null)
+    if (valor === "retorno") {
+      setMensagem(mensagemDeRetorno())
+      setOrigem("fixa")
       return
     }
-    const modelo = lista.find((m) => m.id === valor)
-    if (!modelo) return
-    const resultado = preencherModelo(modelo.texto, valoresDoModelo(lead, new Date()))
-    setPreenchido(resultado)
-    setMensagem(resultado.texto)
+    if (valor === "gemini") setGeradas([])
+    pedir(valor, [])
   }
 
-  function escolhaInicial(lista: ModeloMensagem[]): string {
-    const ultima = lerUltimaEscolha()
-    if (ultima === GEMINI || lista.some((m) => m.id === ultima)) return ultima as string
-    return lista[0]?.id ?? GEMINI
-  }
-
-  async function abrir() {
-    setMensagem("")
+  function abrir() {
+    setBase(null)
     setGeradas([])
-    setPreenchido(null)
-    gerar.reset()
-    escolher("", [])
+    carregar.reset()
     setAberto(true)
-    // Normalmente já estão em cache; senão espera carregar. Sem modelos, vai de Gemini.
-    const lista = await queryClient.ensureQueryData(consultaDosModelos).catch(() => [])
-    if (escolhaAtual.current === "") escolher(escolhaInicial(lista), lista)
+    escolher("completa")
   }
 
   function sugerirRetorno() {
@@ -154,14 +149,45 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
     })
   }
 
-  const ehGemini = escolha === GEMINI
-  const escrevendo = ehGemini && gerar.isPending
-  const link = linkWhatsApp(lead.telefone, mensagem.trim() || undefined)
-  if (!link) return null
+  const carregando = carregar.isPending
+  const pronta = base?.tipo === "pronta" ? base : null
+  const foraDoHorario = base?.tipo === "fora_do_horario"
+  const opcoes: Opcao[] = [
+    ...(pronta ? (["completa", "curta", "gemini"] as const) : []),
+    ...(base && !foraDoHorario && lead.etapa !== "novo" ? (["retorno"] as const) : []),
+  ]
+
+  const motivos =
+    !mensagem.trim() || carregando || opcao === ""
+      ? []
+      : opcao === "retorno"
+        ? validarConteudo(mensagem, pronta?.validacao.nicho ?? null)
+        : pronta
+          ? validarMensagem(mensagem, pronta.validacao)
+          : []
+  const podeAbrir = opcao !== "" && !carregando && mensagem.trim() !== "" && motivos.length === 0
+
+  const linkComTexto = linkWhatsApp(lead.telefone, mensagem.trim() || undefined)
+  const linkSemTexto = linkWhatsApp(lead.telefone)
+  if (!linkSemTexto) return null
+
+  const descricao = foraDoHorario
+    ? "Fora do horário de abordagem."
+    : base?.tipo === "manual" && opcao === ""
+      ? "Sem mensagem automática para este lead."
+      : opcao === "retorno"
+        ? "Confirma se a primeira mensagem chegou."
+        : opcao === "gemini" && origem === "gemini"
+          ? "Redigida pelo Gemini com o mesmo gancho do texto fixo. Revise antes de enviar."
+          : opcao === "gemini" && origem === "fixa"
+            ? "O Gemini não passou na revisão, então veio o texto fixo. Revise antes de enviar."
+            : base
+              ? "Texto fixo, decidido pelo sistema para este lead. Revise antes de enviar."
+              : "Montando a mensagem..."
 
   return (
     <>
-      <Button variant="outline" size={size} onClick={() => void abrir()}>
+      <Button variant="outline" size={size} onClick={abrir}>
         <MessageCircleIcon />
         WhatsApp
       </Button>
@@ -175,95 +201,107 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
         >
           <DialogHeader>
             <DialogTitle>Mensagem para {lead.nome}</DialogTitle>
-            <DialogDescription>
-              {ehGemini ? "Escrita pelo Gemini" : "Modelo preenchido"} com os dados deste lead. Revise antes de
-              enviar.
-            </DialogDescription>
+            <DialogDescription>{descricao}</DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={idDoSeletor}>Mensagem</Label>
-            <Select value={escolha} onValueChange={(v) => escolher(v, modelos.data ?? [])}>
-              <SelectTrigger id={idDoSeletor} className="w-full">
-                <SelectValue placeholder="Carregando modelos..." />
-              </SelectTrigger>
-              <SelectContent>
-                {modelos.data?.map((modelo) => (
-                  <SelectItem key={modelo.id} value={modelo.id}>
-                    {modelo.nome}
-                  </SelectItem>
-                ))}
-                <SelectItem value={GEMINI}>Escrever com o Gemini (IA)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {foraDoHorario && (
+            <p className="rounded-md border bg-muted/50 p-3 text-sm">
+              As mensagens só saem entre {JANELA_DE_HORARIO}, no horário de Fortaleza. Volte nesse horário.
+            </p>
+          )}
 
-          {escrevendo && !mensagem ? (
+          {base?.tipo === "manual" && (
+            <p className="rounded-md border bg-muted/50 p-3 text-sm">
+              {base.motivo === "sem_lacuna"
+                ? "Este lead não tem nenhuma lacuna que o sistema consiga afirmar, então não há gancho automático. Se for abordar, escreva você mesmo."
+                : "A mensagem deste lead sairia fora das regras (por exemplo, nome longo demais), então não é gerada."}
+            </p>
+          )}
+
+          {opcoes.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={idDoSeletor}>Mensagem</Label>
+              <Select value={opcao} onValueChange={(v) => escolher(v as Opcao)}>
+                <SelectTrigger id={idDoSeletor} className="w-full">
+                  <SelectValue placeholder="Escolha" />
+                </SelectTrigger>
+                <SelectContent>
+                  {opcoes.map((valor) => (
+                    <SelectItem key={valor} value={valor}>
+                      {ROTULOS[valor]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {carregando && !mensagem ? (
             <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2Icon className="size-4 animate-spin" />
-              Escrevendo a mensagem...
+              {opcao === "gemini" ? "O Gemini está escrevendo..." : "Montando a mensagem..."}
             </div>
           ) : (
-            (mensagem || !ehGemini) &&
-            escolha !== "" && (
+            opcao !== "" &&
+            mensagem !== "" && (
               <Textarea
                 aria-label="Texto da mensagem"
                 value={mensagem}
                 onChange={(e) => setMensagem(e.target.value)}
-                disabled={escrevendo}
+                disabled={carregando}
                 className="max-h-80 min-h-32"
               />
             )
           )}
-          {ehGemini && gerar.isError && <p className="text-sm text-destructive">{gerar.error.message}</p>}
-          {!ehGemini && preenchido && preenchido.semDado.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Este lead não tem {preenchido.semDado.map((c) => `{${c}}`).join(", ")}: confira se o texto ficou certo.
-            </p>
+          {motivos.length > 0 && (
+            <p className="text-sm text-destructive">Assim não dá pra enviar: {motivos.map(descreverMotivo).join(", ")}.</p>
           )}
-          {!ehGemini && preenchido && preenchido.desconhecidas.length > 0 && (
-            <p className="text-xs text-destructive">
-              {preenchido.desconhecidas.map((c) => `{${c}}`).join(", ")} não é variável. Corrija o modelo em
-              Mensagens.
-            </p>
-          )}
+          {carregar.isError && <p className="text-sm text-destructive">{carregar.error.message}</p>}
 
-          <DialogFooter>
-            {ehGemini ? (
-              <Button variant="outline" disabled={escrevendo} onClick={() => pedir(geradas)}>
-                {escrevendo ? <Loader2Icon className="animate-spin" /> : <RefreshCwIcon />}
-                {geradas.length > 0 || escrevendo ? "Gerar outra" : "Tentar de novo"}
-              </Button>
-            ) : (
-              <Button variant="ghost" asChild>
-                <Link href="/mensagens" onClick={() => setAberto(false)}>
-                  <PencilIcon />
-                  Editar modelos
-                </Link>
-              </Button>
-            )}
-            {escrevendo || escolha === "" ? (
-              <Button disabled>
-                <MessageCircleIcon />
-                Abrir no WhatsApp
-              </Button>
-            ) : (
-              <Button asChild>
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => {
-                    setAberto(false)
-                    sugerirRetorno()
-                  }}
-                >
+          {!foraDoHorario && (base || carregar.isError) && (
+            <DialogFooter>
+              {opcao === "gemini" && (
+                <Button variant="outline" disabled={carregando} onClick={() => pedir("gemini", geradas)}>
+                  {carregando ? <Loader2Icon className="animate-spin" /> : <RefreshCwIcon />}
+                  Gerar outra
+                </Button>
+              )}
+              {carregar.isError && !base && (
+                <Button variant="outline" onClick={abrir}>
+                  <RefreshCwIcon />
+                  Tentar de novo
+                </Button>
+              )}
+              {opcao === "" && base?.tipo === "manual" ? (
+                <Button asChild variant="outline">
+                  <a href={linkSemTexto} target="_blank" rel="noreferrer" onClick={() => setAberto(false)}>
+                    <MessageCircleIcon />
+                    Abrir sem mensagem
+                  </a>
+                </Button>
+              ) : podeAbrir && linkComTexto ? (
+                <Button asChild>
+                  <a
+                    href={linkComTexto}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => {
+                      setAberto(false)
+                      sugerirRetorno()
+                    }}
+                  >
+                    <MessageCircleIcon />
+                    Abrir no WhatsApp
+                  </a>
+                </Button>
+              ) : (
+                <Button disabled>
                   <MessageCircleIcon />
-                  {mensagem.trim() ? "Abrir no WhatsApp" : "Abrir sem mensagem"}
-                </a>
-              </Button>
-            )}
-          </DialogFooter>
+                  Abrir no WhatsApp
+                </Button>
+              )}
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </>
