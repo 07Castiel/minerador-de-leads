@@ -5,9 +5,9 @@
 // Placeholders em MAIÚSCULAS entre chaves são trocados pelo código.
 
 // Ordem = precedência: vale a primeira que o lead tiver.
-// Fora, por enquanto: horário (tem_horario nunca é false, só true ou
-// desconhecido), perfil sem dono (texto pronto abaixo) e avaliações sem
-// resposta (o scraper não lê avaliações).
+// Fora: horário (tem_horario nunca é false, só true ou desconhecido) e
+// avaliações sem resposta (o scraper não lê avaliações).
+// Perfil sem dono fica fora de vez: dado confiável, mas recupera só 2 leads e "o perfil não tem dono" soa mal pra escritório.
 export const LACUNAS_DA_ABORDAGEM = ["sem_site", "link_fora_do_site", "poucas_fotos", "pouca_avaliacao"] as const
 
 export type LacunaDaAbordagem = (typeof LACUNAS_DA_ABORDAGEM)[number]
@@ -22,8 +22,9 @@ export const TEXTOS_DAS_LACUNAS = {
   // leads de hoje vão pro Instagram.
   link_fora_do_site: {
     whatsapp: "o link abre o WhatsApp direto, sem site",
-    redeSocial: "o link vai pro {DESTINO}, mas site não",
-    redeSocialSemNome: "o link vai pra uma rede social, mas site não",
+    // "site não" sobrava: se o link vai pra rede social, já está dito
+    redeSocial: "o link só vai pro {DESTINO}",
+    redeSocialSemNome: "o link só vai pra uma rede social",
     // página de links (Linktree...) ou diretório (Jusbrasil, iFood...)
     pagina: "o link só vai pra uma página no {DESTINO}",
     paginaDeLinksSemNome: "o link só vai pra uma página de links",
@@ -35,8 +36,6 @@ export const TEXTOS_DAS_LACUNAS = {
       advocacia: "Quem te procura por lá chega a ver suas áreas de atuação ou te chama direto?",
     } as Partial<Record<string, string>>,
   },
-  // 2: pronto, mas ainda fora de LACUNAS_DA_ABORDAGEM
-  perfil_sem_dono: "o perfil ainda não tem dono",
   // 3 (só comércio)
   poucas_fotos: {
     nenhuma: "não tem nenhuma foto no perfil",

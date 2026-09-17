@@ -165,9 +165,9 @@ describe("lacunas", () => {
   })
 
   it.each([
-    ["https://www.instagram.com/silva.adv/", "o link vai pro Instagram, mas site não"],
-    ["https://facebook.com/silva.adv", "o link vai pro Facebook, mas site não"],
-    ["https://twitter.com/silva", "o link vai pra uma rede social, mas site não"],
+    ["https://www.instagram.com/silva.adv/", "o link só vai pro Instagram"],
+    ["https://facebook.com/silva.adv", "o link só vai pro Facebook"],
+    ["https://twitter.com/silva", "o link só vai pra uma rede social"],
     ["https://wa.link/abc123", "o link abre o WhatsApp direto, sem site"],
     ["https://linktr.ee/silva", "o link só vai pra uma página no Linktree"],
     ["https://eduardo.linkbio.co", "o link só vai pra uma página no Linkbio"],
