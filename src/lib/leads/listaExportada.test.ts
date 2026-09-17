@@ -111,6 +111,18 @@ describe("itemDaLista", () => {
     expect(r.registro).toBeNull()
   })
 
+  it("formato curto troca a observação da lacuna pela versão enxuta", () => {
+    const curta = itemDaLista(lead({ ...SEM_SITE, nome: "LUIZ CARLOS SILVA ADVOCACIA" }), {
+      faixa: FAIXA,
+      agora: MANHA,
+      formato: "curta",
+    })
+    expect(curta.texto).toContain("não tem site")
+    expect(curta.texto).not.toContain("não tem site, só o telefone")
+    expect(curta.texto.length).toBeLessThan(item({ ...SEM_SITE, nome: "LUIZ CARLOS SILVA ADVOCACIA" }).texto.length)
+    expect(curta.registro?.texto).toBe(curta.texto)
+  })
+
   it("lead já abordado leva o follow-up, registrado como follow_up sem lacuna", () => {
     const r = item({ ...SEM_SITE, etapa: "abordado" })
     expect(r.texto).toBe("Oi! Só confirmando se essa mensagem chegou.")

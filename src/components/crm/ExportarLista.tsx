@@ -26,10 +26,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { saudacaoDoHorario } from "@/lib/leads/abordagem"
 import { SAUDACOES } from "@/lib/leads/abordagemConfig"
 import { registrarAbordagens, ultimasLacunasDaOrg } from "@/lib/leads/abordagens"
-import { listaExportada, temTelefone } from "@/lib/leads/listaExportada"
+import { listaExportada, temTelefone, type FormatoDaLista } from "@/lib/leads/listaExportada"
 import { dataLocalIso } from "@/lib/leads/proximoContato"
 import { supabaseBrowser } from "@/lib/supabase/client"
 import type { Lead } from "@/types/lead"
+
+// Os mesmos rótulos da janela do WhatsApp: é a mesma mensagem.
+const FORMATOS: Record<FormatoDaLista, string> = {
+  completa: "Texto fixo",
+  curta: "Texto fixo curto",
+}
 
 // Faixa da saudação: a lista é enviada depois, então vale a escolha, não o
 // horário da exportação.
@@ -44,6 +50,7 @@ function faixaPadrao(agora: Date): number {
 export function ExportarLista({ leads }: { leads: Lead[] }) {
   const [aberto, setAberto] = useState(false)
   const [faixa, setFaixa] = useState(() => faixaPadrao(new Date()))
+  const [formato, setFormato] = useState<FormatoDaLista>("completa")
   // Fixado ao abrir: a lista não muda enquanto o diálogo está aberto
   const [agora, setAgora] = useState(() => new Date())
   const registrado = useRef(false)
@@ -72,10 +79,11 @@ export function ExportarLista({ leads }: { leads: Lead[] }) {
     return listaExportada(leads, {
       faixa: SAUDACOES[faixa],
       agora,
+      formato,
       termoDaBusca: (lead) => termos.data?.get(lead.id) ?? null,
       ultimasLacunas: ultimas.data ?? [],
     })
-  }, [aberto, carregando, leads, faixa, agora, termos.data, ultimas.data])
+  }, [aberto, carregando, leads, faixa, formato, agora, termos.data, ultimas.data])
 
   const comMensagem = lista?.itens.filter((item) => item.texto !== "").length ?? 0
   const naLista = leads.filter(temTelefone).length
@@ -126,6 +134,7 @@ export function ExportarLista({ leads }: { leads: Lead[] }) {
           const inicio = new Date()
           setAgora(inicio)
           setFaixa(faixaPadrao(inicio))
+          setFormato("completa")
           registrado.current = false
           setAberto(true)
         }}
@@ -143,6 +152,22 @@ export function ExportarLista({ leads }: { leads: Lead[] }) {
               gancho sai com a mensagem em branco e o motivo.
             </DialogDescription>
           </DialogHeader>
+
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="formato-da-lista">Mensagem</Label>
+            <Select value={formato} onValueChange={(v) => setFormato(v as FormatoDaLista)}>
+              <SelectTrigger id="formato-da-lista" className="w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(FORMATOS).map(([valor, rotulo]) => (
+                  <SelectItem key={valor} value={valor}>
+                    {rotulo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="flex items-center justify-between gap-2">
             <Label htmlFor="faixa-da-saudacao">Saudação</Label>

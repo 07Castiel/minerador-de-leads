@@ -79,9 +79,13 @@ export type ItemDaLista = {
   registro: RegistroDeAbordagem | null
 }
 
+export type FormatoDaLista = "completa" | "curta"
+
 type OpcoesDaLista = {
   faixa: FaixaDeSaudacao
   agora: Date
+  // "curta" troca a observação da lacuna pela versão enxuta, como na janela
+  formato?: FormatoDaLista
   // buscas.nicho de cada lead, quando houver: a categoria genérica do Google
   // sozinha jogaria o lead pro nicho "outros"
   termoDaBusca?: (lead: LeadDaLista) => string | null
@@ -126,7 +130,7 @@ export function itemDaLista(lead: LeadDaLista, opcoes: OpcoesDaLista): ItemDaLis
   if (preparo.tipo === "descartado_sem_gancho") return vazio("sem gancho automático")
   if (preparo.tipo !== "pronta") return vazio("falta dado do site pra decidir o gancho")
 
-  const texto = mensagemFixa(preparo.dados)
+  const texto = mensagemFixa(preparo.dados, opcoes.formato)
   const motivos = validarMensagem(texto, preparo.dados)
   if (motivos.length > 0) return vazio(motivos.map(descreverMotivo).join(", "))
   return {
