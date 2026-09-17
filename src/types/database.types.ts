@@ -218,6 +218,7 @@ export type Database = {
           site_carregamento_ms: number | null
           site_detalhe: string | null
           site_dominio_gratuito: boolean | null
+          site_falha: string | null
           site_https: boolean | null
           site_nota_celular: number | null
           site_plataforma: string | null
@@ -267,6 +268,7 @@ export type Database = {
           site_carregamento_ms?: number | null
           site_detalhe?: string | null
           site_dominio_gratuito?: boolean | null
+          site_falha?: string | null
           site_https?: boolean | null
           site_nota_celular?: number | null
           site_plataforma?: string | null
@@ -316,6 +318,7 @@ export type Database = {
           site_carregamento_ms?: number | null
           site_detalhe?: string | null
           site_dominio_gratuito?: boolean | null
+          site_falha?: string | null
           site_https?: boolean | null
           site_nota_celular?: number | null
           site_plataforma?: string | null

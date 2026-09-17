@@ -154,6 +154,14 @@ function textoDaLacuna(lacuna: LacunaDaAbordagemDoLead, textos: TextosDasLacunas
       return textos.sem_site
     case "link_fora_do_site":
       return textoDoLink(lacuna, textos.link_fora_do_site)
+    case "site_dominio_inexistente":
+      return textos.site_dominio_inexistente
+    case "site_certificado_invalido":
+      return textos.site_certificado_invalido
+    case "site_dominio_gratuito":
+      return lacuna.plataforma
+        ? preencher(textos.site_dominio_gratuito.comPlataforma, { PLATAFORMA: lacuna.plataforma })
+        : textos.site_dominio_gratuito.semPlataforma
     case "poucas_fotos":
       if (lacuna.fotos === 0) return textos.poucas_fotos.nenhuma
       if (lacuna.fotos === 1) return textos.poucas_fotos.uma
@@ -357,13 +365,33 @@ export type MensagemDaJanela =
       validacao: Pick<DadosDaAbordagem, "referencia" | "pergunta" | "nicho">
     }
 
+// Análise de site velha demais pra decidir uma lacuna em cima dela: o site pode
+// ter voltado, ou o certificado ter sido renovado. Só vale pra quem tem site.
+export function precisaReverificarSite(
+  lead: Pick<CamposDaAbordagem, "tem_site" | "site_analisado_em">,
+  agora: Date
+): boolean {
+  if (lead.tem_site !== true) return false
+  if (!lead.site_analisado_em) return true
+  const dias = (agora.getTime() - new Date(lead.site_analisado_em).getTime()) / 86_400_000
+  return dias > LIMITES.diasParaReverificarSite
+}
+
+// Abre o site de novo e devolve os campos site_* atualizados (src/lib/leads/analiseServidor.ts).
+export type ReverificadorDeSite = (lead: CamposDaAbordagem) => Promise<Partial<CamposDaAbordagem>>
+
 export async function mensagemParaJanela(
-  lead: CamposDaAbordagem,
+  leadOriginal: CamposDaAbordagem,
   agora: Date,
   modo: ModoDaJanela,
   opcoes: OpcoesDaAbordagem = {},
-  redigir?: Redator
+  redigir?: Redator,
+  reverificarSite?: ReverificadorDeSite
 ): Promise<MensagemDaJanela> {
+  const lead =
+    reverificarSite && precisaReverificarSite(leadOriginal, agora)
+      ? { ...leadOriginal, ...(await reverificarSite(leadOriginal)) }
+      : leadOriginal
   const preparo = prepararAbordagem(lead, agora, opcoes)
   if (preparo.tipo === "fora_do_horario") return preparo
   if (preparo.tipo === "manual") return { tipo: "manual", motivo: preparo.motivo, bloqueios: [] }

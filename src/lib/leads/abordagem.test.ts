@@ -6,6 +6,7 @@ import {
   mensagemDeRetorno,
   mensagemFixa,
   mensagemParaJanela,
+  precisaReverificarSite,
   prepararAbordagem,
   redigirAbordagem,
   resolverNicho,
@@ -52,6 +53,9 @@ const OK: CamposDaAbordagem = {
   site_url: "https://silva.adv.br",
   site_url_final: null,
   site_status: "ok",
+  site_falha: null,
+  site_analisado_em: "2026-09-17T09:00:00Z",
+  site_plataforma: null,
   site_https: true,
   site_responsivo: true,
   site_nota_celular: 90,
@@ -243,6 +247,58 @@ describe("lacunas", () => {
 
   it("site gratuito do Google desativado não é lacuna da abordagem", () => {
     expect(preparar(link("https://silva.business.site")).tipo).toBe("manual")
+  })
+
+  describe("site próprio com problema", () => {
+    const COM_SITE = { tem_site: true, site_url: "https://silva.adv.br" } as const
+
+    it("domínio inexistente (DNS não resolve)", () => {
+      const d = dados({ ...COM_SITE, site_status: "fora_do_ar", site_falha: "ENOTFOUND" })
+      expect(d.lacuna).toBe("site_dominio_inexistente")
+      expect(d.textoDaLacuna).toBe("o endereço do site de vocês não existe mais")
+      expect(d.textoCurtoDaLacuna).toBe("o endereço do site não existe mais")
+    })
+
+    it.each([["TIMEOUT"], ["ECONNREFUSED"], [null]])(
+      "fora do ar por outro motivo (%s) não vira lacuna: medição única pode ser passageira",
+      (falha) => {
+        expect(preparar({ ...COM_SITE, site_status: "fora_do_ar", site_falha: falha }).tipo).toBe("manual")
+      }
+    )
+
+    it("certificado vencido", () => {
+      const d = dados({ ...COM_SITE, site_status: "certificado_invalido", site_falha: "CERT_HAS_EXPIRED" })
+      expect(d.lacuna).toBe("site_certificado_invalido")
+      expect(d.textoDaLacuna).toBe("o site de vocês tá dando erro de segurança pra quem abre")
+      expect(d.textoCurtoDaLacuna).toBe("o site tá com erro de segurança")
+    })
+
+    it("domínio gratuito, com e sem o nome da plataforma", () => {
+      const d = dados({ ...COM_SITE, site_dominio_gratuito: true, site_plataforma: "Google Sites" })
+      expect(d.lacuna).toBe("site_dominio_gratuito")
+      expect(d.textoDaLacuna).toBe("o site de vocês tá num endereço gratuito do Google Sites")
+      expect(d.textoCurtoDaLacuna).toBe("o site tá num endereço gratuito do Google Sites")
+      expect(dados({ ...COM_SITE, site_dominio_gratuito: true, site_plataforma: null }).textoDaLacuna).toBe(
+        "o site de vocês tá num endereço gratuito"
+      )
+    })
+
+    it("valem em qualquer nicho, não só em comércio", () => {
+      for (const categoria of ["Advogado", "Confeitaria", "Escritório da empresa"]) {
+        expect(dados({ ...COM_SITE, categoria, site_status: "fora_do_ar", site_falha: "ENOTFOUND" }).lacuna).toBe(
+          "site_dominio_inexistente"
+        )
+      }
+    })
+
+    it("sem https e lento no celular ficam de fora", () => {
+      expect(preparar({ ...COM_SITE, site_https: false }).tipo).toBe("manual")
+      expect(preparar({ ...COM_SITE, site_nota_celular: 12 }).tipo).toBe("manual")
+    })
+
+    it("site que abre e não tem defeito: manual", () => {
+      expect(preparar(COM_SITE).tipo).toBe("manual")
+    })
   })
 
   it.each([
@@ -779,6 +835,64 @@ describe("mensagemParaJanela", () => {
   })
 })
 
+describe("reverificação do site", () => {
+  const COM_SITE = { ...OK, tem_site: true, site_url: "https://silva.adv.br", site_status: "ok" as const }
+
+  it.each([
+    ["análise de hoje", "2026-09-17T09:00:00Z", false],
+    ["análise de 3 dias", "2026-09-14T13:30:00Z", false],
+    ["análise de 4 dias", "2026-09-13T13:00:00Z", true],
+    ["nunca analisado", null, true],
+  ])("%s → reverifica? %s", (_, analisadoEm, esperado) => {
+    expect(precisaReverificarSite({ ...COM_SITE, site_analisado_em: analisadoEm }, MANHA)).toBe(esperado)
+  })
+
+  it("lead sem site próprio nunca reverifica", () => {
+    expect(precisaReverificarSite({ tem_site: false, site_analisado_em: null }, MANHA)).toBe(false)
+    expect(precisaReverificarSite({ tem_site: null, site_analisado_em: null }, MANHA)).toBe(false)
+  })
+
+  it("site que caiu desde a última análise: a lacuna sai da análise nova", async () => {
+    const velho = { ...COM_SITE, site_analisado_em: "2026-09-01T12:00:00Z" }
+    const reverificar = vi.fn().mockResolvedValue({
+      site_analisado_em: MANHA.toISOString(),
+      site_status: "fora_do_ar",
+      site_falha: "ENOTFOUND",
+    })
+    const r = await mensagemParaJanela(velho, MANHA, "completa", {}, undefined, reverificar)
+    expect(reverificar).toHaveBeenCalledTimes(1)
+    expect(r).toMatchObject({ tipo: "pronta", lacuna: "site_dominio_inexistente" })
+    if (r.tipo !== "pronta") throw new Error("esperava pronta")
+    expect(r.texto).toContain("o endereço do site de vocês não existe mais")
+  })
+
+  it("site que voltou desde a última análise: deixa de ter lacuna", async () => {
+    const caido = {
+      ...COM_SITE,
+      site_status: "fora_do_ar" as const,
+      site_falha: "ENOTFOUND",
+      site_analisado_em: "2026-09-01T12:00:00Z",
+    }
+    expect((await mensagemParaJanela(caido, MANHA, "completa")).tipo).toBe("pronta")
+    const reverificar = vi.fn().mockResolvedValue({
+      site_analisado_em: MANHA.toISOString(),
+      site_status: "ok",
+      site_falha: null,
+    })
+    expect(await mensagemParaJanela(caido, MANHA, "completa", {}, undefined, reverificar)).toEqual({
+      tipo: "manual",
+      motivo: "sem_lacuna",
+      bloqueios: [],
+    })
+  })
+
+  it("análise recente não chama a reverificação", async () => {
+    const reverificar = vi.fn()
+    await mensagemParaJanela({ ...COM_SITE, site_analisado_em: MANHA.toISOString() }, MANHA, "completa", {}, undefined, reverificar)
+    expect(reverificar).not.toHaveBeenCalled()
+  })
+})
+
 describe("config", () => {
   // Nome longo de verdade (do banco).
   const LONGO = { nome: "Advocacia Trabalhista e Previdenciária João Simplício" }
@@ -857,13 +971,20 @@ describe("os 100 leads reais", () => {
     expect(problemas).toEqual([])
   })
 
-  it("distribuição de hoje: 28 sem site, 20 link fora do site, 52 manuais", () => {
+  it("distribuição de hoje, já com a análise de site", () => {
     const contagem: Record<string, number> = {}
     for (const lead of leads) {
       const r = prepararAbordagem(lead, HORARIOS[0], { termoDaBusca: lead.termo_da_busca })
       const chave = r.tipo === "pronta" ? r.dados.lacuna : r.tipo
       contagem[chave] = (contagem[chave] ?? 0) + 1
     }
-    expect(contagem).toEqual({ sem_site: 28, link_fora_do_site: 20, manual: 52 })
+    expect(contagem).toEqual({
+      sem_site: 28,
+      link_fora_do_site: 21,
+      site_dominio_inexistente: 5,
+      site_certificado_invalido: 2,
+      site_dominio_gratuito: 2,
+      manual: 42,
+    })
   })
 })

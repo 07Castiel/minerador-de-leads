@@ -55,6 +55,7 @@ export type AtualizacaoDeSite = Required<
     TablesUpdate<"leads">,
     | "site_analisado_em"
     | "site_status"
+    | "site_falha"
     | "site_detalhe"
     | "site_url_final"
     | "site_https"
@@ -76,6 +77,7 @@ export type AtualizacaoDeSite = Required<
 export const ANALISE_DE_SITE_VAZIA: Omit<AtualizacaoDeSite, "tem_site"> = {
   site_analisado_em: null,
   site_status: null,
+  site_falha: null,
   site_detalhe: null,
   site_url_final: null,
   site_https: null,
@@ -107,6 +109,9 @@ export function normalizarUrlDoSite(raw: string): string | null {
 // Falhas de rede
 
 type Classificacao = { status: StatusSite; detalhe: string }
+
+// Domínio que não resolve: a única falha firme o bastante pra virar mensagem.
+export const FALHA_DE_DNS = "ENOTFOUND"
 
 const FALHAS: Record<string, Classificacao> = {
   ENOTFOUND: { status: "fora_do_ar", detalhe: "O domínio não existe mais (não foi encontrado)." },
@@ -359,7 +364,9 @@ export function analisarSite({ busca, pageSpeed, agora }: EntradaDaAnalise): Atu
 
   if (busca.tipo === "falha") {
     const { status, detalhe } = classificarFalha(busca.codigo)
-    return { ...base, site_status: status, site_detalhe: detalhe }
+    // O código fica guardado: "fora do ar" junta domínio inexistente (firme) com
+    // tempo esgotado e erro de servidor (podem ser passageiros).
+    return { ...base, site_status: status, site_falha: busca.codigo, site_detalhe: detalhe }
   }
 
   if (busca.tipo === "redirecionou_para_fora") {

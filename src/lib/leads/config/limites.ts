@@ -25,6 +25,9 @@ export const LIMITES = {
   repeticaoMaxima: 5,
   // Chamadas ao Gemini antes do texto fixo: a primeira e um retry
   tentativasDoGemini: 2,
+  // Análise de site mais velha que isso: abre o site de novo antes de decidir a
+  // lacuna (o site pode ter voltado, ou o certificado ter sido renovado)
+  diasParaReverificarSite: 3,
 } as const
 
 // Âncora sem pessoa, ou em nicho sem ancoraComPessoa. Verbo de busca ("procurei

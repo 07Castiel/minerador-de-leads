@@ -177,7 +177,7 @@ export async function avancarBusca(admin: Admin, buscaId: string): Promise<Busca
 // Inclui a análise do site: o upsert em lote manda as mesmas colunas em todas
 // as linhas, então quem não muda precisa ir com o valor atual.
 const CAMPOS_DO_EXISTENTE =
-  "id, place_id, maps_url, instagram_handle, site_url, site_analisado_em, site_status, site_detalhe, site_url_final, site_https, site_responsivo, site_tem_whatsapp, site_plataforma, site_dominio_gratuito, site_ano_rodape, site_nota_celular, site_carregamento_ms"
+  "id, place_id, maps_url, instagram_handle, site_url, site_analisado_em, site_status, site_falha, site_detalhe, site_url_final, site_https, site_responsivo, site_tem_whatsapp, site_plataforma, site_dominio_gratuito, site_ano_rodape, site_nota_celular, site_carregamento_ms"
 
 type LeadExistente = {
   id: string

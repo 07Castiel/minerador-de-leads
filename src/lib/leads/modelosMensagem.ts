@@ -3,6 +3,7 @@
 // navegador. Sem IA e sem custo.
 
 import { LIMITES } from "@/lib/leads/abordagemConfig"
+import { FALHA_DE_DNS } from "@/lib/leads/analiseSite"
 import { periodoDoDia } from "@/lib/leads/mensagemWhatsApp"
 import { MINIMO_AVALIACOES_CONFIAVEIS } from "@/lib/leads/motivos"
 import {
@@ -42,10 +43,13 @@ export type CamposDoModelo = Pick<
   | "site_url"
   | "site_url_final"
   | "site_status"
+  | "site_falha"
+  | "site_analisado_em"
   | "site_https"
   | "site_responsivo"
   | "site_nota_celular"
   | "site_dominio_gratuito"
+  | "site_plataforma"
   | "instagram_handle"
   | "perfil_reivindicado"
   | "fotos_count"
@@ -122,12 +126,15 @@ export type LacunaDoLead =
   | { id: "link_fora_do_site"; destino: DestinoDoLink; url: string }
   | { id: "site_desativado" }
   | { id: "site_fora_do_ar" }
+  // Domínio que não resolve no DNS: separado do resto do "fora do ar", que pode
+  // ser passageiro (tempo esgotado, erro de servidor, 404 do link).
+  | { id: "site_dominio_inexistente" }
   | { id: "site_sem_conteudo" }
   | { id: "site_certificado_invalido" }
   | { id: "site_lento_no_celular" }
   | { id: "site_nao_responsivo" }
   | { id: "site_sem_https" }
-  | { id: "site_dominio_gratuito" }
+  | { id: "site_dominio_gratuito"; plataforma: string | null }
   | { id: "perfil_sem_dono" }
   | { id: "poucas_fotos"; fotos: number }
   | { id: "pouca_avaliacao"; avaliacoes: number }
@@ -157,7 +164,7 @@ export function lacunasDoLead(lead: CamposDoModelo): LacunaDoLead[] {
   if (lead.tem_site === true) {
     switch (lead.site_status) {
       case "fora_do_ar":
-        lacunas.push({ id: "site_fora_do_ar" })
+        lacunas.push(lead.site_falha === FALHA_DE_DNS ? { id: "site_dominio_inexistente" } : { id: "site_fora_do_ar" })
         break
       case "sem_conteudo":
         lacunas.push({ id: "site_sem_conteudo" })
@@ -169,7 +176,9 @@ export function lacunasDoLead(lead: CamposDoModelo): LacunaDoLead[] {
         if (lead.site_nota_celular !== null && lead.site_nota_celular < 50) lacunas.push({ id: "site_lento_no_celular" })
         if (lead.site_responsivo === false) lacunas.push({ id: "site_nao_responsivo" })
         if (lead.site_https === false) lacunas.push({ id: "site_sem_https" })
-        if (lead.site_dominio_gratuito) lacunas.push({ id: "site_dominio_gratuito" })
+        if (lead.site_dominio_gratuito) {
+          lacunas.push({ id: "site_dominio_gratuito", plataforma: lead.site_plataforma })
+        }
     }
   }
 
@@ -200,6 +209,8 @@ function fraseDoGancho(lacuna: LacunaDoLead): string {
       return FRASES_DO_LINK[lacuna.destino]
     case "site_desativado":
       return "vi que o site que aparece no perfil já saiu do ar"
+    case "site_dominio_inexistente":
+      return "vi que o endereço do site de vocês não existe mais"
     case "site_fora_do_ar":
       return "tentei abrir o site de vocês e ele não carregou"
     case "site_sem_conteudo":

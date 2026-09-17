@@ -1,6 +1,7 @@
 import { redatorGemini } from "@/lib/gemini"
-import { mensagemParaJanela, type ModoDaJanela } from "@/lib/leads/abordagem"
+import { mensagemParaJanela, type ModoDaJanela, type ReverificadorDeSite } from "@/lib/leads/abordagem"
 import { GEMINI_NA_ABORDAGEM } from "@/lib/leads/abordagemConfig"
+import { analisarSiteDoLead } from "@/lib/leads/analiseServidor"
 import { MAXIMO_DESCARTADAS } from "@/lib/leads/mensagemWhatsApp"
 import { exigirMembro, respostaDeErro } from "@/lib/sessao"
 import { supabaseServer } from "@/lib/supabase/server"
@@ -11,7 +12,7 @@ export const maxDuration = 60
 // Só o que a camada 1 usa. Sem observações: no plano gratuito o Google pode usar
 // o que é enviado (e o Gemini nem recebe mais os dados do lead).
 const CAMPOS_DO_LEAD =
-  "nome, categoria, bairro, cidade, tem_site, site_url, site_url_final, site_status, site_https, site_responsivo, site_nota_celular, site_dominio_gratuito, instagram_handle, perfil_reivindicado, fotos_count, google_rating, google_avaliacoes_count, buscas_leads(buscas(nicho))"
+  "nome, categoria, bairro, cidade, tem_site, site_url, site_url_final, site_status, site_falha, site_analisado_em, site_https, site_responsivo, site_nota_celular, site_dominio_gratuito, site_plataforma, instagram_handle, perfil_reivindicado, fotos_count, google_rating, google_avaliacoes_count, buscas_leads(buscas(nicho))"
 
 const MODOS: readonly ModoDaJanela[] = ["completa", "curta", "gemini"]
 
@@ -49,6 +50,16 @@ export async function POST(request: Request, ctx: RouteContext<"/api/leads/[id]/
   const { buscas_leads, ...lead } = data
   const termoDaBusca = buscas_leads?.[0]?.buscas?.nicho ?? null
 
+  // Análise de site com mais de 3 dias: abre o site de novo antes de decidir a
+  // lacuna, e guarda o resultado.
+  const reverificarSite: ReverificadorDeSite = async (atual) => {
+    const analise = await analisarSiteDoLead(atual)
+    if (!analise) return {}
+    const { error: erroAoSalvar } = await supabase.from("leads").update(analise).eq("id", id)
+    if (erroAoSalvar) console.warn("Não deu pra guardar a reanálise do site", id, erroAoSalvar.message)
+    return analise
+  }
+
   try {
     const resultado = await mensagemParaJanela(
       lead,
@@ -56,7 +67,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/leads/[id]/
       pedido.modo,
       // Anti-repetição fica vazia até existir o registro das mensagens abertas.
       { termoDaBusca },
-      pedido.modo === "gemini" ? redatorGemini(pedido.descartadas) : undefined
+      pedido.modo === "gemini" ? redatorGemini(pedido.descartadas) : undefined,
+      reverificarSite
     )
     // Até existir a tabela de abordagens, o motivo de cada bloqueio fica no log do servidor.
     if ("bloqueios" in resultado && resultado.bloqueios.length > 0) {

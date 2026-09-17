@@ -4,11 +4,23 @@
 // própria observação era o que denunciava texto de IA.
 // Placeholders em MAIÚSCULAS entre chaves são trocados pelo código.
 
-// Ordem = precedência: vale a primeira que o lead tiver.
+// Ordem = precedência: vale a primeira que o lead tiver. As três de site valem
+// só pra quem tem site próprio, então nunca disputam com as duas primeiras.
 // Fora: horário (tem_horario nunca é false, só true ou desconhecido) e
 // avaliações sem resposta (o scraper não lê avaliações).
 // Perfil sem dono fica fora de vez: dado confiável, mas recupera só 2 leads e "o perfil não tem dono" soa mal pra escritório.
-export const LACUNAS_DA_ABORDAGEM = ["sem_site", "link_fora_do_site", "poucas_fotos", "pouca_avaliacao"] as const
+// Site sem https fica fora: o critério só vê que o link http não redireciona, e os 2 casos reais abrem por https normalmente.
+// Site lento no celular fica fora: nota de laboratório que oscila entre execuções, o dono no Wi-Fi vê rápido e desmente a mensagem, e medir demora demais pra reverificar na hora de gerar.
+// Site fora do ar por tempo esgotado, erro 500 ou 404 fica fora: medição única do nosso servidor, que pode ser passageira (só o domínio inexistente entra).
+export const LACUNAS_DA_ABORDAGEM = [
+  "sem_site",
+  "link_fora_do_site",
+  "site_dominio_inexistente",
+  "site_certificado_invalido",
+  "site_dominio_gratuito",
+  "poucas_fotos",
+  "pouca_avaliacao",
+] as const
 
 export type LacunaDaAbordagem = (typeof LACUNAS_DA_ABORDAGEM)[number]
 
@@ -36,6 +48,14 @@ export const TEXTOS_DAS_LACUNAS = {
       advocacia: "Quem te procura por lá chega a ver suas áreas de atuação ou te chama direto?",
     } as Partial<Record<string, string>>,
   },
+  // Site próprio com problema. A âncora já diz "Procurei ... e achei", então o
+  // texto não repete "procurei".
+  site_dominio_inexistente: "o endereço do site de vocês não existe mais",
+  site_certificado_invalido: "o site de vocês tá dando erro de segurança pra quem abre",
+  site_dominio_gratuito: {
+    comPlataforma: "o site de vocês tá num endereço gratuito do {PLATAFORMA}",
+    semPlataforma: "o site de vocês tá num endereço gratuito",
+  },
   // 3 (só comércio)
   poucas_fotos: {
     nenhuma: "não tem nenhuma foto no perfil",
@@ -60,6 +80,12 @@ export const TEXTOS_CURTOS_DAS_LACUNAS = {
     paginaDeLinksSemNome: "o link só vai pra uma página de links",
     plataformaSemNome: "o link não vai pra um site de vocês",
   },
+  site_dominio_inexistente: "o endereço do site não existe mais",
+  site_certificado_invalido: "o site tá com erro de segurança",
+  site_dominio_gratuito: {
+    comPlataforma: "o site tá num endereço gratuito do {PLATAFORMA}",
+    semPlataforma: "o site tá num endereço gratuito",
+  },
   poucas_fotos: {
     nenhuma: "não tem foto no perfil",
     uma: "tem só 1 foto",
@@ -82,6 +108,9 @@ export type TextosDasLacunas = {
     plataformaSemNome: string
     perguntaQuandoPagina?: Partial<Record<string, string>>
   }
+  site_dominio_inexistente: string
+  site_certificado_invalido: string
+  site_dominio_gratuito: { comPlataforma: string; semPlataforma: string }
   poucas_fotos: { nenhuma: string; uma: string; varias: string }
   pouca_avaliacao: { nenhuma: string; poucas: string }
 }
