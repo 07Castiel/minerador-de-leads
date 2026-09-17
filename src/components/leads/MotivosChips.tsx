@@ -24,7 +24,7 @@ export function MotivosChips({ lead, limite, className }: MotivosChipsProps) {
           className={cn(
             "rounded-md px-1.5 py-0.5 text-xs font-medium whitespace-nowrap",
             m.tipo === "oportunidade"
-              ? "bg-amber-100 text-amber-900 dark:bg-amber-400/15 dark:text-amber-300"
+              ? "bg-red-ember text-metal-light ring-1 ring-primary/40 ring-inset"
               : "bg-secondary text-secondary-foreground"
           )}
         >

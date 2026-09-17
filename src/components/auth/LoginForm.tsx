@@ -33,9 +33,11 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-full max-w-sm shadow-glow">
       <CardHeader>
-        <CardTitle>Leads · Núcleo Tech</CardTitle>
+        <CardTitle className="text-xl">
+          Leads <span className="text-primary">·</span> Núcleo Tech
+        </CardTitle>
         <CardDescription>Entre com sua conta para acessar o painel.</CardDescription>
       </CardHeader>
       <CardContent>

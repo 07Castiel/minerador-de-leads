@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 import { Toaster } from "@/components/ui/sonner"
+import type { Tema } from "@/lib/tema"
 
 let browserQueryClient: QueryClient | undefined
 
@@ -14,11 +15,11 @@ function getQueryClient() {
   return browserQueryClient
 }
 
-export function Providers({ children }: { children: ReactNode }) {
+export function Providers({ children, tema }: { children: ReactNode; tema: Tema }) {
   return (
     <QueryClientProvider client={getQueryClient()}>
       {children}
-      <Toaster />
+      <Toaster theme={tema} />
     </QueryClientProvider>
   )
 }

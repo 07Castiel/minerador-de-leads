@@ -38,7 +38,7 @@ function CartaoLead({ lead, arrastando = false }: { lead: Lead; arrastando?: boo
   return (
     <div
       className={cn(
-        "flex flex-col gap-2 rounded-lg border bg-card p-3 text-sm shadow-xs",
+        "flex flex-col gap-2 rounded-lg border bg-card p-3 text-sm shadow-xs transition-colors hover:border-primary/50",
         arrastando && "shadow-lg ring-2 ring-ring/40"
       )}
     >
@@ -103,8 +103,8 @@ function Coluna({ etapa, leads }: { etapa: Etapa; leads: Lead[] }) {
       ref={setNodeRef}
       aria-label={ETAPA_LABELS[etapa]}
       className={cn(
-        "flex w-72 shrink-0 flex-col gap-2 rounded-xl bg-muted/60 p-2 transition-colors",
-        isOver && "bg-accent ring-2 ring-ring/30"
+        "flex w-72 shrink-0 flex-col gap-2 rounded-lg border bg-bg-secondary p-2 transition-colors",
+        isOver && "bg-red-ember/40 ring-2 ring-ring/50"
       )}
     >
       <header className="flex items-baseline justify-between px-1 pt-1">

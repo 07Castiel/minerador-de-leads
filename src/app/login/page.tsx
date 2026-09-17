@@ -10,7 +10,7 @@ export default async function LoginPage() {
   if (await obterSessao()) redirect("/crm")
 
   return (
-    <div className="flex min-h-svh items-center justify-center p-4">
+    <div className="flex min-h-svh items-center justify-center bg-ember p-4">
       <LoginForm />
     </div>
   )

@@ -21,7 +21,7 @@ export function RetornoBadge({
       className={cn(
         "inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap",
         situacao === "atrasado" && "text-destructive",
-        situacao === "hoje" && "text-amber-700 dark:text-amber-400",
+        situacao === "hoje" && "text-warning",
         situacao === "futuro" && "text-muted-foreground",
         className
       )}

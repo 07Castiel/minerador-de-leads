@@ -1,9 +1,13 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/* O tema escuro é o padrão; `dark:` vale sempre que o tema claro não estiver ativo. */
+@custom-variant dark (&:not(:where(.light, .light *)));
 
 @theme inline {
+  --font-sans: var(--font-rajdhani), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-cinzel), ui-serif, Georgia, serif;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -23,61 +27,136 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-bg-secondary: var(--bg-secondary);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
+  /* identidade: vermelho sangue e metal envelhecido */
+  --color-red-bright: var(--red-bright);
+  --color-red-deep: var(--red-deep);
+  --color-red-ember: var(--red-ember);
+  --color-metal-light: var(--metal-light);
+  --color-metal-mid: var(--metal-mid);
+  --color-metal-dark: var(--metal-dark);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  --shadow-glow: var(--shadow-glow);
+
   /* badges de temperatura — não fazem parte do set padrão do shadcn */
-  --color-quente: oklch(0.577 0.245 27.325);
-  --color-quente-foreground: oklch(0.985 0 0);
-  --color-morno: oklch(0.769 0.188 70.08);
-  --color-morno-foreground: oklch(0.145 0 0);
-  --color-frio: oklch(0.6 0.118 260);
-  --color-frio-foreground: oklch(0.985 0 0);
+  --color-quente: var(--primary);
+  --color-quente-foreground: var(--primary-foreground);
+  --color-morno: var(--warning);
+  --color-morno-foreground: var(--warning-foreground);
+  --color-frio: var(--frio);
+  --color-frio-foreground: var(--frio-foreground);
 }
 
+/* Tema escuro (padrão) */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  color-scheme: dark;
+  --radius: 0.5rem;
+
+  /* vermelho sangue */
+  --primary: #b50000;
+  --primary-foreground: #ffffff;
+  --destructive: #b50000;
+  --destructive-foreground: #ffffff;
+  --ring: #b50000;
+  --red-bright: #d40000;
+  --red-deep: #7a0000;
+  --red-ember: #3d0000;
+
+  /* pretos / superfícies */
+  --background: #000000;
+  --sidebar: #050505;
+  --sidebar-foreground: #e8e8e8;
+  --bg-secondary: #080808;
+  --popover: #0a0a0a;
+  --popover-foreground: #e8e8e8;
+  --card: #0e0e0e;
+  --card-foreground: #e8e8e8;
+  --secondary: #111111;
+  --secondary-foreground: #e8e8e8;
+  --muted: #141414;
+  --accent: #1a1a1a;
+  --accent-foreground: #e8e8e8;
+  --border: #222222;
+  --input: #2a2a2a;
+
+  /* metal envelhecido */
+  --metal-light: #c8c8c8;
+  --metal-mid: #909090;
+  --metal-dark: #505050;
+  --foreground: #e8e8e8;
+  --muted-foreground: #888888;
+
+  /* estados */
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+  --frio: #505050;
+  --frio-foreground: #e8e8e8;
+
+  /* gradientes e brilhos */
+  --gradient-primary: linear-gradient(135deg, #b50000, #7a0000);
+  --gradient-ember: radial-gradient(ellipse at top, rgba(181, 0, 0, 0.35), transparent 60%);
+  --shadow-glow: 0 0 30px rgba(181, 0, 0, 0.35), 0 0 60px rgba(181, 0, 0, 0.15);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+/* Tema claro: mantém o vermelho e troca as superfícies por osso/pergaminho */
+.light {
+  color-scheme: light;
+
+  --background: #f4f1ec;
+  --sidebar: #ece7df;
+  --sidebar-foreground: #16110f;
+  --bg-secondary: #ece7df;
+  --popover: #ffffff;
+  --popover-foreground: #16110f;
+  --card: #ffffff;
+  --card-foreground: #16110f;
+  --secondary: #ece7df;
+  --secondary-foreground: #16110f;
+  --muted: #ece7df;
+  --accent: #e3ddd3;
+  --accent-foreground: #16110f;
+  --border: #ddd5c9;
+  --input: #d3cabd;
+
+  --metal-light: #2e2824;
+  --metal-mid: #5a534d;
+  --metal-dark: #8a827a;
+  --red-ember: #f5dedb;
+  --foreground: #16110f;
+  --muted-foreground: #5a534d;
+
+  --frio: #5a534d;
+  --frio-foreground: #ffffff;
+
+  --gradient-ember: radial-gradient(ellipse at top, rgba(181, 0, 0, 0.12), transparent 60%);
+  --shadow-glow: 0 0 30px rgba(181, 0, 0, 0.18), 0 0 60px rgba(181, 0, 0, 0.08);
+}
+
+@utility bg-gradient-primary {
+  background-image: var(--gradient-primary);
+}
+
+@utility bg-ember {
+  background-image: var(--gradient-ember);
+}
+
+@utility card-kombat {
+  background-color: var(--card);
+  border-top: 2px solid var(--primary);
 }
 
 @layer base {
@@ -85,6 +164,17 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans font-medium text-foreground antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  [data-slot="card-title"],
+  [data-slot="dialog-title"] {
+    @apply font-display tracking-wide;
+  }
+  ::selection {
+    background-color: rgba(181, 0, 0, 0.45);
+    color: #ffffff;
   }
 }

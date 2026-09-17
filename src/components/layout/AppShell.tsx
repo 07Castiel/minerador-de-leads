@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 
+import { AlternarTema } from "@/components/layout/AlternarTema"
 import { useSessao } from "@/components/layout/SessaoProvider"
 import { Button } from "@/components/ui/button"
 import { useContagemRetornosPendentes } from "@/hooks/useLeads"
@@ -35,14 +36,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <header className="border-b">
+      <header className="sticky top-0 z-40 border-b bg-sidebar/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4">
-          <div className="flex min-w-0 items-center gap-6">
-            <Link href="/crm" className="hidden shrink-0 truncate text-sm font-semibold md:block">
-              {org.nome} <span className="font-normal text-muted-foreground">· Leads</span>
+          <div className="flex h-full min-w-0 items-center gap-6">
+            <Link
+              href="/crm"
+              className="hidden shrink-0 truncate font-display text-sm font-semibold tracking-wider text-sidebar-foreground md:block"
+            >
+              {org.nome} <span className="font-normal text-primary">· Leads</span>
             </Link>
             {/* No celular os itens rolam na horizontal em vez de quebrar o cabeçalho. */}
-            <nav className="-mx-1 flex min-w-0 items-center gap-4 overflow-x-auto px-1">
+            <nav className="-mx-1 flex h-full min-w-0 items-stretch gap-5 overflow-x-auto px-1">
               {NAV_ITEMS.map((item) => {
                 const ativo = pathname === item.href || pathname.startsWith(`${item.href}/`)
                 const contagem = item.href === "/hoje" ? (retornosPendentes ?? 0) : 0
@@ -52,14 +56,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                     href={item.href}
                     aria-current={ativo ? "page" : undefined}
                     className={cn(
-                      "inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground transition-colors hover:text-foreground",
-                      ativo && "font-medium text-foreground"
+                      "inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent pt-0.5 text-sm font-semibold tracking-wide text-metal-mid uppercase transition-colors hover:text-foreground",
+                      ativo && "border-primary text-foreground"
                     )}
                   >
                     {item.label}
                     {contagem > 0 && (
                       <span
-                        className="rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-primary-foreground"
+                        className="rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-primary-foreground shadow-glow"
                         aria-label={`${contagem} ${contagem === 1 ? "retorno pendente" : "retornos pendentes"}`}
                       >
                         {contagem}
@@ -70,8 +74,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               })}
             </nav>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
             {email && <span className="hidden text-sm text-muted-foreground xl:inline">{email}</span>}
+            <AlternarTema />
             <Button variant="ghost" size="sm" onClick={() => void sair()}>
               Sair
             </Button>
