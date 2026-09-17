@@ -210,19 +210,22 @@ export function ancoraDoLead(lead: Pick<CamposDaAbordagem, "nome">, nicho: Nicho
 }
 
 export type OpcoesDaAbordagem = {
-  // Das mensagens abertas no WhatsApp mais recentes, a mais nova primeiro
+  // Lacunas das últimas mensagens registradas na org, a mais nova primeiro
   ultimasLacunas?: readonly LacunaDaAbordagem[]
   // buscas.nicho da busca que trouxe o lead
   termoDaBusca?: string | null
+  // Saudação escolhida à mão (exportação: a lista é enviada depois, então o
+  // horário de agora não vale, e fora do horário não bloqueia)
+  saudacaoFixa?: string | null
 }
 
 // Camada 1: tudo decidido em código. O horário vem antes: fora dele nada é gerado.
 export function prepararAbordagem(
   lead: CamposDaAbordagem,
   agora: Date,
-  { ultimasLacunas = [], termoDaBusca = null }: OpcoesDaAbordagem = {}
+  { ultimasLacunas = [], termoDaBusca = null, saudacaoFixa = null }: OpcoesDaAbordagem = {}
 ): PreparoDaAbordagem {
-  const saudacao = saudacaoDoHorario(agora)
+  const saudacao = saudacaoFixa ?? saudacaoDoHorario(agora)
   if (!saudacao) return { tipo: "fora_do_horario" }
 
   const nicho = resolverNicho(lead.categoria, termoDaBusca)
@@ -264,11 +267,20 @@ export function mensagemDeRetorno(): string {
 }
 
 // Termo no início de palavra: "orçamentos" bloqueia, "meu crio" não conta como "eu crio".
+// Uma regex por termo, compilada uma vez só: a validação roda por mensagem, e a
+// exportação valida uma lista inteira de leads de uma vez.
+const regexDoTermo = new Map<string, RegExp>()
+
 // Os de TERMOS_DE_PALAVRA_INTEIRA também precisam terminar a palavra.
 function contemTermo(textoNormalizado: string, termo: string): boolean {
-  const alvo = normalizar(termo).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  const fim = TERMOS_DE_PALAVRA_INTEIRA.includes(termo) ? "(?![\\p{L}\\p{N}])" : ""
-  return new RegExp(`(?<![\\p{L}\\p{N}])${alvo}${fim}`, "u").test(textoNormalizado)
+  let regex = regexDoTermo.get(termo)
+  if (!regex) {
+    const alvo = normalizar(termo).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const fim = TERMOS_DE_PALAVRA_INTEIRA.includes(termo) ? "(?![\\p{L}\\p{N}])" : ""
+    regex = new RegExp(`(?<![\\p{L}\\p{N}])${alvo}${fim}`, "u")
+    regexDoTermo.set(termo, regex)
+  }
+  return regex.test(textoNormalizado)
 }
 
 // Também unifica acento decomposto: o Gemini devolve "ã" composto mesmo se o banco não.

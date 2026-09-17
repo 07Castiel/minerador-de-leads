@@ -34,8 +34,10 @@ import {
   type ModoDaJanela,
 } from "@/lib/leads/abordagem"
 import { GEMINI_NA_ABORDAGEM, SAUDACOES } from "@/lib/leads/abordagemConfig"
+import { motivoBloqueioDe, registrarAbordagens } from "@/lib/leads/abordagens"
 import { pedirMensagemDaJanela } from "@/lib/leads/api"
 import { dataLocalIso, descreverRetorno, retornoPendente, somarDias } from "@/lib/leads/proximoContato"
+import { supabaseBrowser } from "@/lib/supabase/client"
 import type { Lead } from "@/types/lead"
 
 type BotaoWhatsAppProps = {
@@ -121,6 +123,29 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
     carregar.reset()
     setAberto(true)
     escolher("completa")
+  }
+
+  // Registra a mensagem quando ela é de fato usada: o clique em "Abrir no
+  // WhatsApp". Abrir a janela e não mandar nada não conta.
+  async function registrar() {
+    if (opcao === "" || !mensagem.trim()) return
+    try {
+      await registrarAbordagens(supabaseBrowser(), [
+        {
+          lead_id: lead.id,
+          tipo: opcao === "retorno" ? "follow_up" : "primeira",
+          lacuna: opcao === "retorno" ? null : (pronta?.lacuna ?? null),
+          nicho: pronta?.validacao.nicho ?? "outros",
+          texto: mensagem.trim(),
+          origem: opcao === "gemini" && origem === "gemini" ? "gemini" : "fixo",
+          aberto_whatsapp: true,
+          motivo_bloqueio: motivoBloqueioDe(pronta?.bloqueios ?? []),
+        },
+      ])
+    } catch (err) {
+      // O WhatsApp já abriu: erro aqui não pode atrapalhar o envio.
+      console.error("Não deu pra registrar a abordagem", err)
+    }
   }
 
   function sugerirRetorno() {
@@ -298,6 +323,7 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
                     rel="noreferrer"
                     onClick={() => {
                       setAberto(false)
+                      void registrar()
                       sugerirRetorno()
                     }}
                   >

@@ -2,6 +2,7 @@ import { redatorGemini } from "@/lib/gemini"
 import { mensagemParaJanela, type ModoDaJanela, type ReverificadorDeSite } from "@/lib/leads/abordagem"
 import { GEMINI_NA_ABORDAGEM } from "@/lib/leads/abordagemConfig"
 import { analisarSiteDoLead } from "@/lib/leads/analiseServidor"
+import { ultimasLacunasDaOrg } from "@/lib/leads/abordagens"
 import { MAXIMO_DESCARTADAS } from "@/lib/leads/mensagemWhatsApp"
 import { exigirMembro, respostaDeErro } from "@/lib/sessao"
 import { supabaseServer } from "@/lib/supabase/server"
@@ -60,13 +61,18 @@ export async function POST(request: Request, ctx: RouteContext<"/api/leads/[id]/
     return analise
   }
 
+  // Anti-repetição: as lacunas das últimas mensagens registradas na org.
+  const ultimasLacunas = await ultimasLacunasDaOrg(supabase).catch((err) => {
+    console.warn("Não deu pra ler as últimas abordagens", err)
+    return []
+  })
+
   try {
     const resultado = await mensagemParaJanela(
       lead,
       new Date(),
       pedido.modo,
-      // Anti-repetição fica vazia até existir o registro das mensagens abertas.
-      { termoDaBusca },
+      { termoDaBusca, ultimasLacunas },
       pedido.modo === "gemini" ? redatorGemini(pedido.descartadas) : undefined,
       reverificarSite
     )

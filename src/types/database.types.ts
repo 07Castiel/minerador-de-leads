@@ -15,6 +15,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      abordagens: {
+        Row: {
+          aberto_whatsapp: boolean
+          criado_em: string
+          id: string
+          lacuna: string | null
+          lead_id: string
+          motivo_bloqueio: string | null
+          nicho: string
+          org_id: string
+          origem: string
+          respondeu: boolean
+          texto: string
+          tipo: string
+        }
+        Insert: {
+          aberto_whatsapp?: boolean
+          criado_em?: string
+          id?: string
+          lacuna?: string | null
+          lead_id: string
+          motivo_bloqueio?: string | null
+          nicho: string
+          org_id?: string
+          origem: string
+          respondeu?: boolean
+          texto: string
+          tipo?: string
+        }
+        Update: {
+          aberto_whatsapp?: boolean
+          criado_em?: string
+          id?: string
+          lacuna?: string | null
+          lead_id?: string
+          motivo_bloqueio?: string | null
+          nicho?: string
+          org_id?: string
+          origem?: string
+          respondeu?: boolean
+          texto?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "abordagens_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abordagens_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       buscas: {
         Row: {
           apify_dataset_id: string | null
