@@ -3,6 +3,9 @@
 
 export const FUSO_DA_ABORDAGEM = "America/Fortaleza"
 
+// Gemini desligado: com a estrutura travada ele não acrescenta texto e custa latência e instabilidade (religar se entrar nicho com mais variação de nome e gancho).
+export const GEMINI_NA_ABORDAGEM: boolean = false
+
 // Faixas [de, ate) no horário local. Fora delas o botão não gera mensagem.
 // Sem "?" de propósito: a mensagem só pode ter a pergunta do nicho.
 export const SAUDACOES = [

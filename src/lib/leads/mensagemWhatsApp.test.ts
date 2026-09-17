@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { prepararAbordagem, type CamposDaAbordagem, type DadosDaAbordagem } from "@/lib/leads/abordagem"
-import { MENSAGEM_FIXA } from "@/lib/leads/abordagemConfig"
+import { GEMINI_NA_ABORDAGEM, MENSAGEM_FIXA } from "@/lib/leads/abordagemConfig"
 import {
   INSTRUCOES_DO_REDATOR,
   limparMensagem,
@@ -43,17 +43,27 @@ describe("INSTRUCOES_DO_REDATOR", () => {
   it("não diz o que o remetente vende nem sugere abertura ou fechamento", () => {
     expect(INSTRUCOES_DO_REDATOR).not.toMatch(/cria sites|criar sites|site próprio|sugestão sorteada|OFERTA/i)
   })
+
+  it("manda copiar a pergunta literalmente e não fala em tratamento", () => {
+    expect(INSTRUCOES_DO_REDATOR).toContain("A {PERGUNTA} vem pronta, com a concordância já resolvida: copie literalmente")
+    expect(INSTRUCOES_DO_REDATOR).not.toMatch(/TRATAMENTO/)
+  })
+})
+
+describe("Gemini na abordagem", () => {
+  it("fica desligado por padrão", () => {
+    expect(GEMINI_NA_ABORDAGEM).toBe(false)
+  })
 })
 
 describe("montarPedidoDoRedator", () => {
-  it("leva só os elementos decididos pela camada 1", () => {
+  it("leva só os elementos decididos pela camada 1, sem tratamento", () => {
     expect(montarPedidoDoRedator(dados())).toBe(
       [
         "<SAUDACAO>Bom dia!</SAUDACAO>",
         "<ANCORA>Procurei o escritório de Luiz Carlos no Google e achei</ANCORA>",
         "<LACUNA>não tem site, só o telefone</LACUNA>",
         "<PERGUNTA>Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?</PERGUNTA>",
-        "<TRATAMENTO>você</TRATAMENTO>",
       ].join("\n") + "\n\nEscreva a mensagem."
     )
   })

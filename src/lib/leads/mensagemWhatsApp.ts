@@ -1,8 +1,9 @@
 // Camada 2 da abordagem por WhatsApp: o Gemini só redige. Recebe saudação,
-// âncora, lacuna, pergunta e tratamento já decididos pela camada 1
+// âncora, lacuna e pergunta já decididas pela camada 1
 // (src/lib/leads/abordagem.ts) e encaixa com fluência. Não recebe os dados crus
 // do lead: era deles que saía gancho inventado. A chamada à API fica em
 // src/lib/gemini.ts; tudo aqui é puro, pra testar sem chamar a API.
+// Hoje desligado (GEMINI_NA_ABORDAGEM no config).
 
 import type { DadosDaAbordagem, TentativaBloqueada } from "@/lib/leads/abordagem"
 import { LIMITES, MENSAGEM_FIXA } from "@/lib/leads/abordagemConfig"
@@ -10,7 +11,7 @@ import { LIMITES, MENSAGEM_FIXA } from "@/lib/leads/abordagemConfig"
 // A estrutura vem do mesmo config do texto fixo.
 export const INSTRUCOES_DO_REDATOR = `Você redige uma única mensagem de WhatsApp de primeiro contato, em português brasileiro natural do Ceará. Você NÃO decide o conteúdo: recebe todos os elementos já resolvidos e apenas os encaixa com fluência.
 
-Os elementos chegam entre tags com o mesmo nome: <SAUDACAO>, <ANCORA>, <LACUNA>, <PERGUNTA> e <TRATAMENTO> (você ou vocês, para a concordância).
+Os elementos chegam entre tags com o mesmo nome: <SAUDACAO>, <ANCORA>, <LACUNA> e <PERGUNTA>.
 
 Estrutura obrigatória, no máximo 3 linhas, sem linha em branco:
 ${MENSAGEM_FIXA}
@@ -19,7 +20,8 @@ Regras:
 - Não escolha outro gancho. Se notar outra coisa no perfil, ignore.
 - Não elogie o negócio, o atendimento nem as avaliações.
 - Não diga o que o remetente vende, não ofereça nada, não peça permissão para mandar nada, não prometa resultado.
-- A mensagem termina na {PERGUNTA}, exatamente como recebida. Nada depois.
+- A {PERGUNTA} vem pronta, com a concordância já resolvida: copie literalmente, sem trocar você por vocês nem nenhuma outra palavra.
+- A mensagem termina na {PERGUNTA}. Nada depois.
 - Uma única interrogação em toda a mensagem.
 - Sem travessão, sem reticências, sem emoji, sem markdown.
 - Máximo ${LIMITES.caracteres} caracteres. Devolva apenas o texto da mensagem.
@@ -36,16 +38,17 @@ type ContextoDoPedido = {
 }
 
 export function montarPedidoDoRedator(
-  dados: Pick<DadosDaAbordagem, "saudacao" | "ancora" | "textoDaLacuna" | "pergunta" | "tratamento">,
+  dados: Pick<DadosDaAbordagem, "saudacao" | "ancora" | "textoDaLacuna" | "pergunta">,
   { descartadas = [], bloqueiosAnteriores = [] }: ContextoDoPedido = {}
 ): string {
+  // Sem tratamento (você/vocês): a camada 1 já resolve dentro da lacuna e da
+  // pergunta, e mandar isso fazia o Gemini "corrigir" a pergunta fixa.
   const partes = [
     [
       `<SAUDACAO>${dados.saudacao}</SAUDACAO>`,
       `<ANCORA>${dados.ancora}</ANCORA>`,
       `<LACUNA>${dados.textoDaLacuna}</LACUNA>`,
       `<PERGUNTA>${dados.pergunta}</PERGUNTA>`,
-      `<TRATAMENTO>${dados.tratamento}</TRATAMENTO>`,
     ].join("\n"),
   ]
 

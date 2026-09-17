@@ -33,7 +33,7 @@ import {
   type MensagemDaJanela,
   type ModoDaJanela,
 } from "@/lib/leads/abordagem"
-import { SAUDACOES } from "@/lib/leads/abordagemConfig"
+import { GEMINI_NA_ABORDAGEM, SAUDACOES } from "@/lib/leads/abordagemConfig"
 import { pedirMensagemDaJanela } from "@/lib/leads/api"
 import { dataLocalIso, descreverRetorno, retornoPendente, somarDias } from "@/lib/leads/proximoContato"
 import type { Lead } from "@/types/lead"
@@ -153,7 +153,8 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
   const pronta = base?.tipo === "pronta" ? base : null
   const foraDoHorario = base?.tipo === "fora_do_horario"
   const opcoes: Opcao[] = [
-    ...(pronta ? (["completa", "curta", "gemini"] as const) : []),
+    ...(pronta ? (["completa", "curta"] as const) : []),
+    ...(pronta && GEMINI_NA_ABORDAGEM ? (["gemini"] as const) : []),
     ...(base && !foraDoHorario && lead.etapa !== "novo" ? (["retorno"] as const) : []),
   ]
 

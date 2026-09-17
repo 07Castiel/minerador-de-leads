@@ -1,5 +1,6 @@
 import { redatorGemini } from "@/lib/gemini"
 import { mensagemParaJanela, type ModoDaJanela } from "@/lib/leads/abordagem"
+import { GEMINI_NA_ABORDAGEM } from "@/lib/leads/abordagemConfig"
 import { MAXIMO_DESCARTADAS } from "@/lib/leads/mensagemWhatsApp"
 import { exigirMembro, respostaDeErro } from "@/lib/sessao"
 import { supabaseServer } from "@/lib/supabase/server"
@@ -35,6 +36,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/leads/[id]/
   const { id } = await ctx.params
   const pedido = lerPedido(await request.json().catch(() => null))
   if (!pedido) return respostaDeErro('Envie { modo: "completa" | "curta" | "gemini", descartadas?: string[] }.', 400)
+  if (pedido.modo === "gemini" && !GEMINI_NA_ABORDAGEM) {
+    return respostaDeErro("O Gemini está desligado na abordagem (GEMINI_NA_ABORDAGEM).", 400)
+  }
 
   // Leitura com a sessão do usuário: a RLS garante que o lead é da org dele.
   const supabase = await supabaseServer()
