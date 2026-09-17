@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeftIcon, DownloadIcon, SendIcon } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
+import { ArrowLeftIcon, DownloadIcon, GlobeIcon, Loader2Icon, SendIcon, SparklesIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { BuscaStatusBadge } from "@/components/minerador/BuscaStatusBadge"
@@ -10,6 +11,10 @@ import { ResultadosTable } from "@/components/minerador/ResultadosTable"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useBusca, useBuscaLeads, useEnviarAoCrm } from "@/hooks/useBuscas"
+import { CHAVE_FUNIL } from "@/hooks/useLeads"
+import { analisarSiteDoLead } from "@/lib/leads/api"
+import { MINIMO_AVALIACOES_CONFIAVEIS, temSiteComProblema } from "@/lib/leads/motivos"
+import { classificarLink } from "@/lib/leads/presencaDigital"
 import { baixarCsv, leadsParaCsv, nomeArquivoCsv } from "@/lib/minerador/exportCsv"
 import { descreverFiltros, formatarDataHora, formatarUsd } from "@/lib/minerador/formatacao"
 import { descreverLocal } from "@/lib/minerador/regras"
@@ -25,19 +30,37 @@ function Stat({ label, value }: { label: string; value: string | number | null }
   )
 }
 
-type FiltroResultado = "fora_do_crm" | "sem_site" | "com_telefone"
+type FiltroResultado =
+  | "fora_do_crm"
+  | "sem_site"
+  | "perfil_sem_dono"
+  | "com_telefone"
+  | "estabelecido"
+  | "site_com_problema"
 
 const FILTROS: { id: FiltroResultado; label: string }[] = [
   { id: "fora_do_crm", label: "Só fora do CRM" },
   { id: "sem_site", label: "Só sem site" },
+  { id: "perfil_sem_dono", label: "Só perfil Google sem dono" },
   { id: "com_telefone", label: "Só com telefone" },
+  { id: "estabelecido", label: "Só com 5+ avaliações" },
+  { id: "site_com_problema", label: "Só site com problema" },
 ]
+
+// Cada análise abre o site e espera o PageSpeed (até ~1 min): poucas de cada vez.
+const ANALISES_SIMULTANEAS = 3
+
+// "Melhores leads" para vender site: sem site próprio, dá pra ligar e já tem
+// clientela (5+ avaliações). Poucas avaliações ainda não dizem se a nota é real.
+const MELHORES_LEADS: FiltroResultado[] = ["sem_site", "com_telefone", "estabelecido"]
 
 export function BuscaResultadosView({ id }: { id: string }) {
   const { data: busca, isLoading, error } = useBusca(id)
   const concluida = busca?.status === "concluida"
   const { data: leads, isLoading: carregandoLeads, error: erroLeads } = useBuscaLeads(id, concluida)
   const enviar = useEnviarAoCrm(id)
+  const queryClient = useQueryClient()
+  const [analise, setAnalise] = useState<{ feitos: number; total: number } | null>(null)
 
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [filtros, setFiltros] = useState<Set<FiltroResultado>>(new Set())
@@ -47,11 +70,59 @@ export function BuscaResultadosView({ id }: { id: string }) {
       (leads ?? []).filter((l) => {
         if (filtros.has("fora_do_crm") && l.no_funil) return false
         if (filtros.has("sem_site") && l.tem_site !== false) return false
+        if (filtros.has("perfil_sem_dono") && l.perfil_reivindicado !== false) return false
         if (filtros.has("com_telefone") && !l.telefone) return false
+        if (filtros.has("site_com_problema") && !temSiteComProblema(l)) return false
+        if (
+          filtros.has("estabelecido") &&
+          (l.google_avaliacoes_count ?? 0) < MINIMO_AVALIACOES_CONFIAVEIS
+        ) {
+          return false
+        }
         return true
       }),
     [leads, filtros]
   )
+
+  // Sites próprios ainda não analisados entre os resultados visíveis.
+  const sitesParaAnalisar = visiveis.filter(
+    (l) => !l.site_analisado_em && classificarLink(l.site_url)?.tipo === "site"
+  )
+
+  async function analisarSites() {
+    const fila = [...sitesParaAnalisar]
+    const total = fila.length
+    let feitos = 0
+    let falhas = 0
+    let semChave = false
+    setAnalise({ feitos, total })
+
+    async function trabalhar() {
+      for (let lead = fila.shift(); lead; lead = fila.shift()) {
+        try {
+          const resposta = await analisarSiteDoLead(lead.id)
+          if (resposta.velocidade === "sem_chave") semChave = true
+        } catch {
+          falhas++
+        }
+        feitos++
+        setAnalise({ feitos, total })
+        void queryClient.invalidateQueries({ queryKey: ["buscas", id, "leads"] })
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(ANALISES_SIMULTANEAS, total) }, trabalhar))
+    setAnalise(null)
+    void queryClient.invalidateQueries({ queryKey: CHAVE_FUNIL })
+
+    const analisados = total - falhas
+    const resumo = `${analisados} ${analisados === 1 ? "site analisado" : "sites analisados"}${
+      falhas > 0 ? `, ${falhas} com erro` : ""
+    }.`
+    const descricao = semChave ? "A velocidade no celular não foi medida: falta a chave do PageSpeed." : undefined
+    if (falhas > 0) toast.warning(resumo, { description: descricao })
+    else toast.success(resumo, { description: descricao })
+  }
 
   // Só conta seleção de leads visíveis e ainda fora do CRM.
   const idsParaEnviar = visiveis.filter((l) => !l.no_funil && selecionados.has(l.id)).map((l) => l.id)
@@ -72,6 +143,16 @@ export function BuscaResultadosView({ id }: { id: string }) {
     setSelecionados((atual) => {
       const novo = new Set(atual)
       selecionaveis.forEach((leadId) => (todos ? novo.delete(leadId) : novo.add(leadId)))
+      return novo
+    })
+  }
+
+  const melhoresAtivos = MELHORES_LEADS.every((f) => filtros.has(f))
+
+  function alternarMelhores() {
+    setFiltros((atual) => {
+      const novo = new Set(atual)
+      MELHORES_LEADS.forEach((f) => (melhoresAtivos ? novo.delete(f) : novo.add(f)))
       return novo
     })
   }
@@ -164,6 +245,16 @@ export function BuscaResultadosView({ id }: { id: string }) {
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant={melhoresAtivos ? "default" : "secondary"}
+                aria-pressed={melhoresAtivos}
+                title="Sem site próprio, com telefone e com 5 ou mais avaliações"
+                onClick={alternarMelhores}
+              >
+                <SparklesIcon />
+                Melhores leads
+              </Button>
               {FILTROS.map((f) => (
                 <Button
                   key={f.id}
@@ -182,6 +273,22 @@ export function BuscaResultadosView({ id }: { id: string }) {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={analise !== null || sitesParaAnalisar.length === 0}
+                title={
+                  sitesParaAnalisar.length === 0
+                    ? "Nenhum site próprio sem análise entre os resultados visíveis"
+                    : "Abre cada site: se está no ar, HTTPS, celular, WhatsApp e velocidade"
+                }
+                onClick={() => void analisarSites()}
+              >
+                {analise ? <Loader2Icon className="animate-spin" /> : <GlobeIcon />}
+                {analise
+                  ? `Analisando ${analise.feitos} de ${analise.total}...`
+                  : `Analisar sites (${sitesParaAnalisar.length})`}
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

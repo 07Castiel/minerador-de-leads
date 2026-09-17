@@ -17,12 +17,17 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useLeadsDoFunil } from "@/hooks/useLeads"
+import { temSiteComProblema } from "@/lib/leads/motivos"
+import { dataLocalIso, retornoPendente } from "@/lib/leads/proximoContato"
 import type { Lead } from "@/types/lead"
 
 const TODAS = "__todas__"
 
 const ATALHOS = [
+  { id: "retornar_hoje", label: "Retornar hoje" },
   { id: "sem_site", label: "Sem site" },
+  { id: "site_com_problema", label: "Site com problema" },
+  { id: "perfil_sem_dono", label: "Perfil Google sem dono" },
   { id: "quente", label: "Quentes" },
   { id: "com_telefone", label: "Com telefone" },
 ] as const
@@ -90,8 +95,12 @@ export function CrmView() {
 
   const filtrados = useMemo(() => {
     const termo = busca.trim().toLowerCase()
+    const hoje = dataLocalIso(new Date())
     const lista = (leads ?? []).filter((lead) => {
+      if (atalhos.has("retornar_hoje") && !retornoPendente(lead.proximo_contato, hoje)) return false
       if (atalhos.has("sem_site") && lead.tem_site !== false) return false
+      if (atalhos.has("site_com_problema") && !temSiteComProblema(lead)) return false
+      if (atalhos.has("perfil_sem_dono") && lead.perfil_reivindicado !== false) return false
       if (atalhos.has("quente") && lead.temperatura !== "quente") return false
       if (atalhos.has("com_telefone") && !lead.telefone) return false
       if (categoria && lead.categoria !== categoria) return false

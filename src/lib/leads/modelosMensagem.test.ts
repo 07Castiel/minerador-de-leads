@@ -1,0 +1,125 @@
+import { describe, expect, it } from "vitest"
+
+import {
+  ganchoDoLead,
+  nomeCurto,
+  preencherModelo,
+  valoresDoModelo,
+  type CamposDoModelo,
+} from "@/lib/leads/modelosMensagem"
+
+const VAZIO: CamposDoModelo = {
+  nome: "Silva Advocacia",
+  categoria: null,
+  bairro: null,
+  cidade: null,
+  tem_site: null,
+  site_url: null,
+  site_url_final: null,
+  site_status: null,
+  site_https: null,
+  site_responsivo: null,
+  site_nota_celular: null,
+  site_dominio_gratuito: null,
+  instagram_handle: null,
+  perfil_reivindicado: null,
+  google_rating: null,
+  google_avaliacoes_count: null,
+}
+
+const gancho = (lead: Partial<CamposDoModelo>) => ganchoDoLead({ ...VAZIO, ...lead })
+
+// 15h UTC = 12h em Brasília
+const TARDE = new Date("2026-09-17T15:00:00Z")
+
+describe("nomeCurto", () => {
+  it.each([
+    ["Garcia, Lima & Becco Advogados - Advogado Fortaleza - Advogado Trabalhista", "Garcia, Lima & Becco Advogados"],
+    ["Joao Felipe Gurjão | Advogado | Direito Médico | Fortaleza", "Joao Felipe Gurjão"],
+    ["⚖️Tíssia Cavalcanti - Advocacia de Família e Sucessões | Fortaleza - CE", "Tíssia Cavalcanti"],
+    ["ADVOGADO DAS FAMÍLIAS | EDUARDO ALBUQUERQUE", "Advogado das Famílias"],
+    ["BMI Advocacia", "BMI Advocacia"],
+    ["Dr. Fernando - Advogado Bancário", "Dr. Fernando"],
+    ["Hugo Gondim Advocacia-Especialista", "Hugo Gondim Advocacia-Especialista"],
+  ])("%s → %s", (nome, esperado) => {
+    expect(nomeCurto(nome)).toBe(esperado)
+  })
+})
+
+describe("ganchoDoLead", () => {
+  it("sem site próprio, pelo tipo de link", () => {
+    expect(gancho({ tem_site: false })).toBe("vi que ainda não têm um site")
+    expect(gancho({ tem_site: false, site_url: "https://instagram.com/silva.adv" })).toBe(
+      "vi que o link do perfil leva direto pro Instagram"
+    )
+    expect(gancho({ tem_site: false, site_url: "https://wa.me/5585999999999" })).toBe(
+      "vi que o link do perfil abre direto o WhatsApp, sem um site"
+    )
+    expect(
+      gancho({
+        tem_site: false,
+        site_url: "https://bit.ly/x",
+        site_status: "nao_e_site",
+        site_url_final: "https://api.whatsapp.com/send?phone=5585999999999",
+      })
+    ).toBe("vi que o link do perfil abre direto o WhatsApp, sem um site")
+    expect(gancho({ tem_site: false, site_url: "https://silva.jusbrasil.com.br" })).toMatch(/outra plataforma/)
+  })
+
+  it("site com problema, do mais grave ao mais leve", () => {
+    const site = { tem_site: true, site_url: "https://silva.adv.br", site_status: "ok" } as const
+    expect(gancho({ ...site, site_status: "fora_do_ar" })).toBe("tentei abrir o site de vocês e ele não carregou")
+    expect(gancho({ ...site, site_nota_celular: 30, site_responsivo: false })).toBe(
+      "vi que o site de vocês demora pra abrir no celular"
+    )
+    expect(gancho({ ...site, site_responsivo: false, site_https: false })).toBe(
+      "vi que o site de vocês não se ajusta direito no celular"
+    )
+    expect(gancho({ ...site, site_https: false })).toBe('vi que o site de vocês aparece como "não seguro" no navegador')
+  })
+
+  it("sem nada a apontar, cai no perfil sem dono ou numa pergunta neutra", () => {
+    expect(gancho({ tem_site: true, site_status: "ok", perfil_reivindicado: false })).toBe(
+      "vi que o perfil ainda não foi assumido pelo dono"
+    )
+    expect(gancho({ tem_site: true })).toBe("fiquei curioso pra saber como vocês recebem clientes pela internet hoje")
+  })
+})
+
+describe("preencherModelo", () => {
+  const modelo =
+    "{saudacao}! Falo com {nome}?\n\nEncontrei vocês no Google e {gancho}. Eu crio sites para negócios aqui de {cidade}."
+
+  it("troca as variáveis pelos dados do lead", () => {
+    const valores = valoresDoModelo(
+      { ...VAZIO, nome: "Costa e Moura Advogados | Trabalhista", cidade: "Fortaleza", tem_site: false },
+      TARDE
+    )
+    expect(preencherModelo(modelo, valores)).toEqual({
+      texto:
+        "Boa tarde! Falo com Costa e Moura Advogados?\n\nEncontrei vocês no Google e vi que ainda não têm um site. Eu crio sites para negócios aqui de Fortaleza.",
+      semDado: [],
+      desconhecidas: [],
+    })
+  })
+
+  it("variável sem dado fica em branco e é avisada; {desconhecida} fica como está", () => {
+    const valores = valoresDoModelo({ ...VAZIO, tem_site: false }, TARDE)
+    const r = preencherModelo("Oi, {nome} aqui de {cidade}, {bairro}! Nota {nota}. {Nomee}", valores)
+    expect(r.texto).toBe("Oi, Silva Advocacia aqui de,! Nota. {Nomee}")
+    expect(r.semDado).toEqual(["cidade", "bairro", "nota"])
+    expect(r.desconhecidas).toEqual(["Nomee"])
+  })
+
+  it("nota só com 5+ avaliações; aceita maiúsculas e espaços na chave", () => {
+    const poucas = valoresDoModelo({ ...VAZIO, google_rating: 5, google_avaliacoes_count: 2 }, TARDE)
+    expect(poucas.nota).toBeNull()
+    const muitas = valoresDoModelo({ ...VAZIO, google_rating: 4.8, google_avaliacoes_count: 1320 }, TARDE)
+    expect(preencherModelo("{ NOTA } com {avaliacoes}", muitas).texto).toBe("4,8 com 1.320")
+  })
+
+  it("não confunde chave com propriedade de objeto", () => {
+    const valores = valoresDoModelo(VAZIO, TARDE)
+    expect(preencherModelo("{constructor} {toString}", valores).desconhecidas).toEqual(["constructor", "toString"])
+  })
+})

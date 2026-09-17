@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   FILTROS_PADRAO,
   descreverLocal,
+  encontrarCidade,
   estimarCustoUsd,
   limiteCobrancaUsd,
   mapearLugar,
@@ -41,6 +42,10 @@ const ITEM_APIFY = {
   totalScore: 4.7,
   reviewsCount: 132,
   location: { lat: -3.6863, lng: -40.3498 },
+  claimThisBusiness: true,
+  imagesCount: 3,
+  permanentlyClosed: false,
+  temporarilyClosed: false,
 }
 
 describe("validarNovaBusca", () => {
@@ -88,8 +93,12 @@ describe("custo", () => {
     expect(estimarCustoUsd({ maxResultados: 100, filtros })).toBe(0.7)
   })
 
-  it("limite de cobrança fica acima da estimativa", () => {
-    expect(limiteCobrancaUsd(BUSCA)).toBe(0.47)
+  it("limite de cobrança fica acima da estimativa e nunca abaixo do mínimo do Apify", () => {
+    // 100 leads: 0,40 + 10% + 0,02 = 0,46 → sobe pro mínimo de 0,50
+    expect(limiteCobrancaUsd(BUSCA)).toBe(0.5)
+    expect(limiteCobrancaUsd({ ...BUSCA, maxResultados: 10 })).toBe(0.5)
+    // 200 leads: 0,80 + 10% + 0,02 = 0,90
+    expect(limiteCobrancaUsd({ ...BUSCA, maxResultados: 200 })).toBe(0.9)
   })
 })
 
@@ -99,6 +108,28 @@ describe("local e input do Apify", () => {
     expect(montarLocationQuery({ ...BUSCA, bairro: "Centro" })).toBe("Centro, Sobral, Ceará, Brasil")
     expect(descreverLocal({ ...BUSCA, bairro: "Centro" })).toBe("Centro, Sobral/CE")
     expect(montarOrigem(BUSCA)).toBe("Minerador: Barbearia em Sobral/CE")
+  })
+
+  it("desambigua cidades com nome repetido e aceita apóstrofo", () => {
+    // "Santa Luzia" existe em PB, MG, MA e BA: o nome do estado resolve
+    expect(montarLocationQuery({ uf: "PB", cidade: "Santa Luzia", bairro: null })).toBe(
+      "Santa Luzia, Paraíba, Brasil"
+    )
+    expect(montarLocationQuery({ uf: "AL", cidade: "Olho d'Água das Flores", bairro: null })).toBe(
+      "Olho d'Água das Flores, Alagoas, Brasil"
+    )
+    expect(montarLocationQuery({ uf: "CE", cidade: "Fortaleza", bairro: "Aldeota" })).toBe(
+      "Aldeota, Fortaleza, Ceará, Brasil"
+    )
+  })
+
+  it("acha a cidade digitada na lista do IBGE", () => {
+    const lista = ["Fortaleza", "Olho D'Água do Piauí", "Pau D'Arco do Piauí", "São João da Canabrava"]
+    expect(encontrarCidade(lista, "  fortaleza ")).toBe("Fortaleza")
+    expect(encontrarCidade(lista, "olho d’agua do piaui")).toBe("Olho D'Água do Piauí")
+    expect(encontrarCidade(lista, "sao joao  da canabrava")).toBe("São João da Canabrava")
+    expect(encontrarCidade(lista, "Fortalezaa")).toBeNull()
+    expect(encontrarCidade(lista, "")).toBeNull()
   })
 
   it("sem filtros não liga nenhum add-on pago", () => {
@@ -144,8 +175,14 @@ describe("mapearLugar", () => {
         endereco: ITEM_APIFY.address,
         telefone: "(88) 99612-3456",
         tem_site: true,
+        site_url: "https://barbeariadocentro.com.br",
+        instagram_handle: null,
         google_rating: 4.7,
         google_avaliacoes_count: 132,
+        perfil_reivindicado: false,
+        fotos_count: 3,
+        tem_descricao: null,
+        tem_horario: null,
         latitude: -3.6863,
         longitude: -40.3498,
       },
@@ -164,6 +201,50 @@ describe("mapearLugar", () => {
       latitude: null,
       longitude: null,
     })
+  })
+
+  it("Instagram, WhatsApp ou link de bio no lugar do site = sem site, guardando o link", () => {
+    const r = mapearLugar({ ...ITEM_APIFY, website: "https://www.instagram.com/barbearia.centro/" })
+    expect(r.ok && r.valor).toMatchObject({
+      tem_site: false,
+      site_url: "https://www.instagram.com/barbearia.centro/",
+      instagram_handle: "barbearia.centro",
+    })
+    const zap = mapearLugar({ ...ITEM_APIFY, website: "https://wa.me/5588996123456" })
+    expect(zap.ok && zap.valor.tem_site).toBe(false)
+  })
+
+  it("sinais do perfil: só afirma o que o Google informou", () => {
+    const semSinais = mapearLugar({ title: "X", url: "https://maps/x" })
+    expect(semSinais.ok && semSinais.valor).toMatchObject({
+      perfil_reivindicado: null,
+      fotos_count: null,
+      tem_descricao: null,
+      tem_horario: null,
+    })
+
+    // descrição/horário ausentes ou vazios (sem o add-on de detalhe) não viram "não tem"
+    const vazios = mapearLugar({ ...ITEM_APIFY, description: null, openingHours: [] })
+    expect(vazios.ok && vazios.valor).toMatchObject({ tem_descricao: null, tem_horario: null })
+
+    const completos = mapearLugar({
+      ...ITEM_APIFY,
+      claimThisBusiness: false,
+      description: "A melhor barbearia de Sobral",
+      openingHours: [{ day: "segunda-feira", hours: "9 às 19" }],
+    })
+    expect(completos.ok && completos.valor).toMatchObject({
+      perfil_reivindicado: true,
+      tem_descricao: true,
+      tem_horario: true,
+    })
+  })
+
+  it("descarta negócio fechado sem pagar o filtro do Apify", () => {
+    const definitivo = mapearLugar({ ...ITEM_APIFY, permanentlyClosed: true })
+    expect(definitivo.ok).toBe(false)
+    expect(!definitivo.ok && definitivo.erro).toContain("fechou definitivamente")
+    expect(mapearLugar({ ...ITEM_APIFY, temporarilyClosed: true }).ok).toBe(false)
   })
 
   it("usa telefone sem formatação quando o formatado falta", () => {
@@ -185,7 +266,11 @@ describe("mapearLugar", () => {
   it("nunca escreve etapa, observações, score ou outros campos do funil", () => {
     const r = mapearLugar(ITEM_APIFY)
     const chaves = Object.keys(r.ok ? r.valor : {})
-    for (const campo of NEVER_IMPORTED_FIELDS) expect(chaves).not.toContain(campo)
+    // instagram_handle é a exceção: vem do link do Google, e no processamento
+    // só preenche quando o lead ainda não tem um @ digitado à mão.
+    for (const campo of NEVER_IMPORTED_FIELDS.filter((c) => c !== "instagram_handle")) {
+      expect(chaves).not.toContain(campo)
+    }
   })
 })
 
@@ -197,10 +282,11 @@ describe("prepararLeads", () => {
       { ...ITEM_APIFY, placeId: "ChIJoutro" }, // mesma URL
       { ...ITEM_APIFY, placeId: "ChIJnovo", url: "https://maps/novo", title: "Outro" },
       { title: "Sem url" },
+      { ...ITEM_APIFY, placeId: "ChIJfechado", url: "https://maps/fechado", permanentlyClosed: true },
     ]
     const r = prepararLeads(itens)
     expect(r.leads.map((l) => l.nome)).toEqual(["Barbearia do Centro", "Outro"])
-    expect(r.ignorados).toBe(3)
+    expect(r.ignorados).toBe(4)
   })
 })
 

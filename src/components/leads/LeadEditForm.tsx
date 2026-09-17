@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { toast } from "sonner"
 
+import { ProximoContatoCampo } from "@/components/leads/ProximoContatoCampo"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
@@ -31,10 +32,15 @@ export function LeadEditForm({ lead }: { lead: Lead }) {
   const [etapa, setEtapa] = useState<Etapa>(etapaInicial)
   const [motivo, setMotivo] = useState<MotivoPerda | "">((lead.motivo_perda as MotivoPerda | null) ?? "")
   const [observacoes, setObservacoes] = useState(lead.observacoes ?? "")
+  const [proximoContato, setProximoContato] = useState(lead.proximo_contato ?? "")
   const updateLead = useUpdateLead(lead.id)
 
   const mudouEtapa = etapa !== etapaInicial || (etapa === "perdido" && motivo !== (lead.motivo_perda ?? ""))
   const mudouObservacoes = observacoes !== (lead.observacoes ?? "")
+  const mudouRetorno = proximoContato !== (lead.proximo_contato ?? "")
+  // O banco apaga o retorno de quem acabou de virar cliente ou ser perdido.
+  const retornoVaiSerApagado =
+    proximoContato !== "" && etapa !== etapaInicial && (etapa === "convertido" || etapa === "perdido")
   const faltaMotivo = etapa === "perdido" && motivo === ""
 
   function handleSave() {
@@ -42,6 +48,7 @@ export function LeadEditForm({ lead }: { lead: Lead }) {
       {
         ...(mudouEtapa ? dadosDaMudancaDeEtapa({ id: lead.id, etapa, motivoPerda: motivo || null }) : {}),
         observacoes: observacoes.trim() === "" ? null : observacoes,
+        proximo_contato: proximoContato || null,
         ...(lead.no_funil ? {} : { no_funil: true }),
       },
       {
@@ -89,6 +96,13 @@ export function LeadEditForm({ lead }: { lead: Lead }) {
         )}
       </div>
 
+      <ProximoContatoCampo id="proximo-contato" value={proximoContato} onChange={setProximoContato} />
+      {retornoVaiSerApagado && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          Ao salvar como {ETAPA_LABELS[etapa]}, o retorno marcado é apagado.
+        </p>
+      )}
+
       <div className="flex flex-col gap-2">
         <Label htmlFor="observacoes">Observações</Label>
         <Textarea
@@ -103,7 +117,11 @@ export function LeadEditForm({ lead }: { lead: Lead }) {
       <div className="flex items-center gap-3">
         <Button
           onClick={handleSave}
-          disabled={(!mudouEtapa && !mudouObservacoes && lead.no_funil) || faltaMotivo || updateLead.isPending}
+          disabled={
+            (!mudouEtapa && !mudouObservacoes && !mudouRetorno && lead.no_funil) ||
+            faltaMotivo ||
+            updateLead.isPending
+          }
         >
           {updateLead.isPending ? "Salvando..." : lead.no_funil ? "Salvar" : "Salvar e enviar ao CRM"}
         </Button>

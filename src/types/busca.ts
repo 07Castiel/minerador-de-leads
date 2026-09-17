@@ -3,7 +3,7 @@ import type { Tables } from "@/types/database.types"
 export type Busca = Tables<"buscas">
 
 // Espelha a CHECK constraint de buscas.status
-// (supabase/migrations/20260916150000_multi_conta_minerador_crm.sql).
+// (supabase/migrations/20260916180000_schema_inicial.sql).
 export const BUSCA_STATUS_VALUES = [
   "iniciando",
   "rodando",

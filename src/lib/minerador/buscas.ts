@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { ANALISE_DE_SITE_VAZIA, type AtualizacaoDeSite } from "@/lib/leads/analiseSite"
 import {
   STATUS_TERMINAIS_APIFY,
   baixarDataset,
@@ -173,7 +174,18 @@ export async function avancarBusca(admin: Admin, buscaId: string): Promise<Busca
   return finalizada
 }
 
-type LeadExistente = { id: string; place_id: string | null; maps_url: string | null }
+// Inclui a análise do site: o upsert em lote manda as mesmas colunas em todas
+// as linhas, então quem não muda precisa ir com o valor atual.
+const CAMPOS_DO_EXISTENTE =
+  "id, place_id, maps_url, instagram_handle, site_url, site_analisado_em, site_status, site_detalhe, site_url_final, site_https, site_responsivo, site_tem_whatsapp, site_plataforma, site_dominio_gratuito, site_ano_rodape, site_nota_celular, site_carregamento_ms"
+
+type LeadExistente = {
+  id: string
+  place_id: string | null
+  maps_url: string | null
+  instagram_handle: string | null
+  site_url: string | null
+} & Omit<AtualizacaoDeSite, "tem_site">
 
 async function buscarExistentes(admin: Admin, orgId: string, leads: LeadMinerado[]) {
   const porPlace = new Map<string, LeadExistente>()
@@ -190,7 +202,7 @@ async function buscarExistentes(admin: Admin, orgId: string, leads: LeadMinerado
   for (const lote of chunks(placeIds, LOTE_CONSULTA_PLACE)) {
     const { data, error } = await admin
       .from("leads")
-      .select("id, place_id, maps_url")
+      .select(CAMPOS_DO_EXISTENTE)
       .eq("org_id", orgId)
       .in("place_id", lote)
     if (error) throw error
@@ -200,7 +212,7 @@ async function buscarExistentes(admin: Admin, orgId: string, leads: LeadMinerado
   for (const lote of chunks(leads.map((l) => l.maps_url), LOTE_CONSULTA_URL)) {
     const { data, error } = await admin
       .from("leads")
-      .select("id, place_id, maps_url")
+      .select(CAMPOS_DO_EXISTENTE)
       .eq("org_id", orgId)
       .in("maps_url", lote)
     if (error) throw error
@@ -225,6 +237,9 @@ async function salvarResultados(admin: Admin, busca: Busca, datasetId: string) {
       // Lead novo fica fora do CRM até alguém escolher enviá-lo (no_funil).
       novos.push({
         ...lead,
+        // Negócio sem endereço público (atende na casa do cliente, online...)
+        // vem sem cidade; ele apareceu na busca daquela cidade.
+        cidade: lead.cidade ?? busca.cidade,
         org_id: busca.org_id,
         origem: montarOrigem(busca),
         no_funil: false,
@@ -235,12 +250,27 @@ async function salvarResultados(admin: Admin, busca: Busca, datasetId: string) {
 
     // Já existia: atualiza só os dados do Google. Etapa, observações, origem e
     // no_funil ficam como estão; maps_url também (evita colidir com outra linha).
-    const { maps_url: _mapsUrl, place_id, ...dadosGoogle } = lead
+    const { maps_url: _mapsUrl, place_id, instagram_handle, ...dadosGoogle } = lead
+    const {
+      id: _id,
+      place_id: _placeId,
+      maps_url: _mapsUrlAtual,
+      instagram_handle: _instagram,
+      site_url: linkAtual,
+      ...analiseAtual
+    } = achado
+    const mesmoLink = linkAtual === dadosGoogle.site_url
     atualizacoes.push({
       ...dadosGoogle,
+      // Análise do site vale enquanto o link for o mesmo; link novo, análise zerada.
+      ...(mesmoLink ? analiseAtual : ANALISE_DE_SITE_VAZIA),
+      // Link que redireciona para rede social continua contando como sem site.
+      ...(mesmoLink && achado.site_status === "nao_e_site" ? { tem_site: false } : {}),
       id: achado.id,
       org_id: busca.org_id,
       place_id: achado.place_id ?? place_id,
+      // @ digitado à mão vale mais que o deduzido do link do Google
+      instagram_handle: achado.instagram_handle ?? instagram_handle,
     })
   }
 

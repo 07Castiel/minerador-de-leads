@@ -1,19 +1,22 @@
 "use client"
 
-import { MessageCircleIcon, PhoneIcon } from "lucide-react"
+import { PhoneIcon } from "lucide-react"
 
+import { BotaoWhatsApp } from "@/components/leads/BotaoWhatsApp"
 import { Button } from "@/components/ui/button"
-import { linkLigacao, linkWhatsApp, pareceCelular } from "@/lib/contato"
+import { linkLigacao, pareceCelular } from "@/lib/contato"
+import type { Lead } from "@/types/lead"
 
 type ContatoBotoesProps = {
-  telefone: string | null
+  // Lead inteiro: os modelos de WhatsApp usam bairro, site, etapa etc.
+  lead: Lead
   tamanho?: "xs" | "sm"
 }
 
 // Ligar sempre que houver telefone; WhatsApp só para celular.
-export function ContatoBotoes({ telefone, tamanho = "sm" }: ContatoBotoesProps) {
-  const ligar = linkLigacao(telefone)
-  const whatsapp = pareceCelular(telefone) ? linkWhatsApp(telefone) : null
+export function ContatoBotoes({ lead, tamanho = "sm" }: ContatoBotoesProps) {
+  const ligar = linkLigacao(lead.telefone)
+  const whatsapp = pareceCelular(lead.telefone)
   if (!ligar && !whatsapp) return null
 
   const size = tamanho === "xs" ? "xs" : "sm"
@@ -28,14 +31,7 @@ export function ContatoBotoes({ telefone, tamanho = "sm" }: ContatoBotoesProps) 
           </a>
         </Button>
       )}
-      {whatsapp && (
-        <Button asChild variant="outline" size={size}>
-          <a href={whatsapp} target="_blank" rel="noreferrer">
-            <MessageCircleIcon />
-            WhatsApp
-          </a>
-        </Button>
-      )}
+      {whatsapp && <BotaoWhatsApp lead={lead} size={size} />}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { FIELD_DEFINITIONS } from "@/lib/import/fieldDefinitions"
+import { temSiteProprio } from "@/lib/leads/presencaDigital"
 import type {
   ColumnMapping,
   ImportControlledField,
@@ -69,11 +70,12 @@ export function normalizeText(raw: unknown): string | null {
 
 // true/false a partir de um valor de linha JÁ SABENDO que a coluna de
 // presença de site está mapeada — vazio/ausente = sem site (confirmado pela
-// fonte), qualquer outra coisa presente = tem site. Nunca retorna null aqui;
-// null só existe quando a coluna inteira não foi mapeada (ver normalizeRow).
+// fonte); link de rede social, bio ou plataforma (iFood...) também = sem site
+// próprio; qualquer outro link = tem site. Nunca retorna null aqui; null só
+// existe quando a coluna inteira não foi mapeada (ver normalizeRow).
 export function deriveTemSiteFromValue(raw: unknown): boolean {
   if (raw === null || raw === undefined) return false
-  if (typeof raw === "string") return raw.trim() !== ""
+  if (typeof raw === "string") return temSiteProprio(raw)
   if (typeof raw === "boolean") return raw
   return true
 }

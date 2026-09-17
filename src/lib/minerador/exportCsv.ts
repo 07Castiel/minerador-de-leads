@@ -1,5 +1,7 @@
 import Papa from "papaparse"
 
+import { ROTULO_STATUS_SITE, type StatusSite } from "@/lib/leads/analiseSite"
+import { motivosDoLead } from "@/lib/leads/motivos"
 import { ETAPA_LABELS, isEtapa, type Lead } from "@/types/lead"
 
 // Excel em pt-BR abre CSV separado por ";" e precisa do BOM pra acentuação.
@@ -28,6 +30,20 @@ const COLUNAS: { titulo: string; valor: (lead: Lead) => string | number | boolea
   { titulo: "Temperatura", valor: (l) => l.temperatura },
   { titulo: "Etapa", valor: (l) => (isEtapa(l.etapa) ? ETAPA_LABELS[l.etapa] : l.etapa) },
   { titulo: "Google Maps", valor: (l) => l.maps_url },
+  { titulo: "Link no Google", valor: (l) => l.site_url },
+  { titulo: "Perfil Google reivindicado", valor: (l) => l.perfil_reivindicado },
+  { titulo: "Fotos no Google", valor: (l) => l.fotos_count },
+  {
+    titulo: "Site: situação",
+    valor: (l) =>
+      l.site_status ? (ROTULO_STATUS_SITE[l.site_status as StatusSite] ?? l.site_status) : null,
+  },
+  { titulo: "Site: nota no celular", valor: (l) => l.site_nota_celular },
+  { titulo: "Destaques", valor: (l) => motivosDoLead(l).map((m) => m.texto).join(" · ") },
+  {
+    titulo: "Próximo contato",
+    valor: (l) => (l.proximo_contato ? l.proximo_contato.split("-").reverse().join("/") : null),
+  },
 ]
 
 export function leadsParaCsv(leads: Lead[]): string {

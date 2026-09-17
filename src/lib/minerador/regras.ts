@@ -1,6 +1,8 @@
 // Regras puras do minerador (sem I/O): validação da busca, custo, input do
 // Apify e conversão do dataset em leads. Usadas no servidor e no navegador.
 
+import { classificarLink } from "@/lib/leads/presencaDigital"
+
 export const APIFY_ACTOR_ID = "compass~crawler-google-places"
 
 // Preços do Google Maps Scraper no plano FREE do Apify (conferidos em
@@ -216,10 +218,18 @@ export function estimarCustoUsd(busca: Pick<NovaBusca, "maxResultados" | "filtro
   return Math.round(busca.maxResultados * porLugar * 10_000) / 10_000
 }
 
+// O Apify recusa a run se o teto for menor que isso (erro
+// "max-total-charge-usd-below-minimum", visto em 2026-09-16).
+export const LIMITE_COBRANCA_MINIMO_APIFY_USD = 0.5
+
 // Trava enviada ao Apify (`maxTotalChargeUsd`): a run para sozinha se passar
-// disso. Margem de 10% + 2 centavos (start do actor), arredondada pra cima.
+// disso. Margem de 10% + 2 centavos (start do actor), arredondada pra cima. É
+// só um teto — o que se paga continua sendo o que a run consumir.
 export function limiteCobrancaUsd(busca: Pick<NovaBusca, "maxResultados" | "filtros">): number {
-  return Math.ceil((estimarCustoUsd(busca) * 1.1 + 0.02) * 100) / 100
+  // arredonda antes do ceil: 0,8 × 1,1 dá 0,8800000000000001 em ponto flutuante
+  const centavos = Math.round((estimarCustoUsd(busca) * 1.1 + 0.02) * 100 * 1000) / 1000
+  const comMargem = Math.ceil(centavos) / 100
+  return Math.max(LIMITE_COBRANCA_MINIMO_APIFY_USD, comMargem)
 }
 
 // Nome completo do estado em vez da sigla: o geocoder do actor (OpenStreetMap)
@@ -227,6 +237,25 @@ export function limiteCobrancaUsd(busca: Pick<NovaBusca, "maxResultados" | "filt
 export function montarLocationQuery(busca: Pick<NovaBusca, "uf" | "cidade" | "bairro">): string {
   const partes = [busca.bairro, busca.cidade, nomeDaUf(busca.uf) ?? busca.uf, "Brasil"]
   return partes.filter((p): p is string => !!p).join(", ")
+}
+
+function normalizarNomeDeCidade(nome: string): string {
+  return nome
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    // celular e Word trocam ' por ’ ou ‘; o IBGE usa '
+    .replace(/[‘’´`]/g, "'")
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .trim()
+}
+
+// Acha a cidade digitada na lista oficial do IBGE, ignorando acento, caixa,
+// espaços e tipo de apóstrofo. Devolve o nome oficial (ou null).
+export function encontrarCidade(cidades: readonly string[], digitada: string): string | null {
+  const alvo = normalizarNomeDeCidade(digitada)
+  if (!alvo) return null
+  return cidades.find((c) => normalizarNomeDeCidade(c) === alvo) ?? null
 }
 
 export function descreverLocal(busca: { uf: string; cidade: string; bairro: string | null }): string {
@@ -281,6 +310,14 @@ export const CAMPOS_DATASET_APIFY = [
   "totalScore",
   "reviewsCount",
   "location",
+  // Sinais grátis do perfil (vêm na busca básica, sem add-on)
+  "claimThisBusiness",
+  "imagesCount",
+  "permanentlyClosed",
+  "temporarilyClosed",
+  // Só vêm com o add-on pago "place detail page"; sem ele ficam ausentes
+  "description",
+  "openingHours",
 ] as const
 
 // Colunas "import-controlled" (as mesmas da tela de import) + place_id.
@@ -295,8 +332,16 @@ export type LeadMinerado = {
   endereco: string | null
   telefone: string | null
   tem_site: boolean
+  // link cru que o negócio cadastrou (site, Instagram, iFood...)
+  site_url: string | null
+  instagram_handle: string | null
   google_rating: number | null
   google_avaliacoes_count: number | null
+  // null = o Google não informou (não é o mesmo que false)
+  perfil_reivindicado: boolean | null
+  fotos_count: number | null
+  tem_descricao: boolean | null
+  tem_horario: boolean | null
   latitude: number | null
   longitude: number | null
 }
@@ -327,8 +372,16 @@ export function mapearLugar(item: unknown): Resultado<LeadMinerado> {
   const mapsUrl = texto(item.url)
   if (!mapsUrl) return { ok: false, erro: `"${nome}" sem link do Google Maps` }
 
+  // Não dá pra vender pra quem fechou — descarta aqui, de graça, em vez de
+  // pagar o filtro "skipClosedPlaces" do Apify.
+  if (item.permanentlyClosed === true) return { ok: false, erro: `"${nome}" fechou definitivamente` }
+  if (item.temporarilyClosed === true) return { ok: false, erro: `"${nome}" está fechado temporariamente` }
+
   const location = isRecord(item.location) ? item.location : {}
   const avaliacoes = numero(item.reviewsCount, 0)
+  const fotos = numero(item.imagesCount, 0)
+  // O scraper sempre informa o link quando existe; ausência também é "sem site".
+  const link = classificarLink(texto(item.website))
 
   return {
     ok: true,
@@ -342,10 +395,21 @@ export function mapearLugar(item: unknown): Resultado<LeadMinerado> {
       endereco: texto(item.address),
       // formatado primeiro ("(88) 99999-9999"): a lista é pra gente ligar/ler.
       telefone: texto(item.phone) ?? texto(item.phoneUnformatted),
-      // o scraper sempre informa o site quando existe — ausência é "sem site".
-      tem_site: texto(item.website) !== null,
+      // Instagram, WhatsApp, link de bio ou iFood no lugar do site = sem site próprio.
+      tem_site: link?.tipo === "site",
+      site_url: link?.url ?? null,
+      instagram_handle: link?.instagramHandle ?? null,
       google_rating: numero(item.totalScore, 0, 5),
       google_avaliacoes_count: avaliacoes === null ? null : Math.round(avaliacoes),
+      // claimThisBusiness = o Google mostra "Reivindicar esta empresa"
+      perfil_reivindicado:
+        typeof item.claimThisBusiness === "boolean" ? !item.claimThisBusiness : null,
+      fotos_count: fotos === null ? null : Math.round(fotos),
+      // Descrição e horário só chegam com o add-on de página de detalhe. Sem
+      // ele os campos vêm ausentes ou null — e isso não prova que o perfil
+      // não tem. Só afirmamos o que foi visto.
+      tem_descricao: texto(item.description) !== null ? true : null,
+      tem_horario: Array.isArray(item.openingHours) && item.openingHours.length > 0 ? true : null,
       latitude: numero(location.lat, -90, 90),
       longitude: numero(location.lng, -180, 180),
     },

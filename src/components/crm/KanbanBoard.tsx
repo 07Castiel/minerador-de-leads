@@ -18,6 +18,8 @@ import { toast } from "sonner"
 
 import { MotivoPerdaDialog } from "@/components/crm/MotivoPerdaDialog"
 import { ContatoBotoes } from "@/components/leads/ContatoBotoes"
+import { MotivosChips } from "@/components/leads/MotivosChips"
+import { RetornoBadge } from "@/components/leads/RetornoBadge"
 import { TemperaturaBadge } from "@/components/leads/TemperaturaBadge"
 import { useMudarEtapa } from "@/hooks/useLeads"
 import { cn } from "@/lib/utils"
@@ -59,19 +61,16 @@ function CartaoLead({ lead, arrastando = false }: { lead: Lead; arrastando?: boo
       </p>
       <div className="flex flex-wrap items-center gap-1.5">
         <TemperaturaBadge temperatura={lead.temperatura} />
-        {lead.tem_site === false && (
-          <span className="rounded-md bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive">
-            Sem site
-          </span>
-        )}
+        <RetornoBadge proximoContato={lead.proximo_contato} />
         {lead.etapa === "perdido" && lead.motivo_perda && (
           <span className="text-xs text-muted-foreground">
             {MOTIVO_PERDA_LABELS[lead.motivo_perda as MotivoPerda] ?? lead.motivo_perda}
           </span>
         )}
       </div>
+      <MotivosChips lead={lead} limite={3} />
       <div onPointerDown={(e) => e.stopPropagation()}>
-        <ContatoBotoes telefone={lead.telefone} tamanho="xs" />
+        <ContatoBotoes lead={lead} tamanho="xs" />
       </div>
     </div>
   )

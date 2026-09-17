@@ -3,13 +3,17 @@
 import Link from "next/link"
 import { ArrowLeftIcon, ExternalLinkIcon } from "lucide-react"
 
+import { AnaliseSiteCard } from "@/components/leads/AnaliseSiteCard"
 import { ContatoBotoes } from "@/components/leads/ContatoBotoes"
 import { EtapaBadge } from "@/components/leads/EtapaBadge"
 import { LeadEditForm } from "@/components/leads/LeadEditForm"
+import { MotivosChips } from "@/components/leads/MotivosChips"
+import { RetornoBadge } from "@/components/leads/RetornoBadge"
 import { TemperaturaBadge } from "@/components/leads/TemperaturaBadge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useLead } from "@/hooks/useLead"
+import { motivosDoLead } from "@/lib/leads/motivos"
 
 function Field({ label, value }: { label: string; value: string | number | null | undefined }) {
   return (
@@ -45,6 +49,7 @@ export function LeadDetail({ id }: { id: string }) {
               ) : (
                 <span className="text-xs text-muted-foreground">Fora do CRM</span>
               )}
+              <RetornoBadge proximoContato={lead.proximo_contato} />
             </div>
             <p className="text-sm text-muted-foreground">
               {[lead.categoria, lead.cidade].filter(Boolean).join(" · ")}
@@ -52,7 +57,7 @@ export function LeadDetail({ id }: { id: string }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <ContatoBotoes telefone={lead.telefone} />
+          <ContatoBotoes lead={lead} />
           {lead.maps_url && (
             <Button asChild variant="outline" size="sm">
               <a href={lead.maps_url} target="_blank" rel="noreferrer">
@@ -66,6 +71,21 @@ export function LeadDetail({ id }: { id: string }) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Por que esse lead</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {motivosDoLead(lead).length > 0 ? (
+                <MotivosChips lead={lead} />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum sinal forte de oportunidade nos dados do Google.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Identificação</CardTitle>
@@ -102,10 +122,34 @@ export function LeadDetail({ id }: { id: string }) {
             <CardContent>
               <dl className="grid grid-cols-2 gap-3">
                 <Field
-                  label="Tem site?"
+                  label="Tem site próprio?"
                   value={lead.tem_site === null ? "Desconhecido" : lead.tem_site ? "Sim" : "Não"}
                 />
-                <Field label="Instagram" value={lead.instagram_handle} />
+                <div>
+                  <dt className="text-sm text-muted-foreground">Link no Google</dt>
+                  <dd className="truncate text-sm">
+                    {lead.site_url ? (
+                      <a
+                        href={/^https?:\/\//i.test(lead.site_url) ? lead.site_url : `https://${lead.site_url}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary underline underline-offset-4"
+                      >
+                        {lead.site_url.replace(/^https?:\/\/(www\.)?/i, "")}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </dd>
+                </div>
+                <Field
+                  label="Perfil Google reivindicado?"
+                  value={
+                    lead.perfil_reivindicado === null ? null : lead.perfil_reivindicado ? "Sim" : "Não"
+                  }
+                />
+                <Field label="Fotos no Google" value={lead.fotos_count} />
+                <Field label="Instagram" value={lead.instagram_handle ? `@${lead.instagram_handle}` : null} />
                 <Field label="Seguidores" value={lead.instagram_seguidores} />
                 <Field label="Último post (dias)" value={lead.instagram_ultimo_post_dias} />
                 <Field label="Nota no Google" value={lead.google_rating} />
@@ -114,16 +158,26 @@ export function LeadDetail({ id }: { id: string }) {
               </dl>
             </CardContent>
           </Card>
+
         </div>
 
-        <Card className="self-start">
-          <CardHeader>
-            <CardTitle className="text-base">Funil</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <LeadEditForm key={`${lead.id}-${lead.etapa}-${lead.atualizado_em}`} lead={lead} />
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-6 self-start">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Funil</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Recria o formulário só quando os campos dele mudam fora dele: analisar o
+                  site (que muda atualizado_em) não apaga o que está sendo digitado. */}
+              <LeadEditForm
+                key={[lead.id, lead.etapa, lead.motivo_perda, lead.observacoes, lead.proximo_contato].join("|")}
+                lead={lead}
+              />
+            </CardContent>
+          </Card>
+
+          <AnaliseSiteCard lead={lead} />
+        </div>
       </div>
     </div>
   )

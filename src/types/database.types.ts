@@ -192,6 +192,7 @@ export type Database = {
           endereco: string | null
           etapa: string
           etapa_atualizada_em: string | null
+          fotos_count: number | null
           google_avaliacoes_count: number | null
           google_avaliacoes_sem_resposta: number | null
           google_rating: number | null
@@ -208,9 +209,26 @@ export type Database = {
           observacoes: string | null
           org_id: string
           origem: string | null
+          perfil_reivindicado: boolean | null
           place_id: string | null
+          proximo_contato: string | null
           score: number | null
+          site_analisado_em: string | null
+          site_ano_rodape: number | null
+          site_carregamento_ms: number | null
+          site_detalhe: string | null
+          site_dominio_gratuito: boolean | null
+          site_https: boolean | null
+          site_nota_celular: number | null
+          site_plataforma: string | null
+          site_responsivo: boolean | null
+          site_status: string | null
+          site_tem_whatsapp: boolean | null
+          site_url: string | null
+          site_url_final: string | null
           telefone: string | null
+          tem_descricao: boolean | null
+          tem_horario: boolean | null
           tem_site: boolean | null
           temperatura: string | null
         }
@@ -223,6 +241,7 @@ export type Database = {
           endereco?: string | null
           etapa?: string
           etapa_atualizada_em?: string | null
+          fotos_count?: number | null
           google_avaliacoes_count?: number | null
           google_avaliacoes_sem_resposta?: number | null
           google_rating?: number | null
@@ -239,9 +258,26 @@ export type Database = {
           observacoes?: string | null
           org_id?: string
           origem?: string | null
+          perfil_reivindicado?: boolean | null
           place_id?: string | null
+          proximo_contato?: string | null
           score?: number | null
+          site_analisado_em?: string | null
+          site_ano_rodape?: number | null
+          site_carregamento_ms?: number | null
+          site_detalhe?: string | null
+          site_dominio_gratuito?: boolean | null
+          site_https?: boolean | null
+          site_nota_celular?: number | null
+          site_plataforma?: string | null
+          site_responsivo?: boolean | null
+          site_status?: string | null
+          site_tem_whatsapp?: boolean | null
+          site_url?: string | null
+          site_url_final?: string | null
           telefone?: string | null
+          tem_descricao?: boolean | null
+          tem_horario?: boolean | null
           tem_site?: boolean | null
           temperatura?: string | null
         }
@@ -254,6 +290,7 @@ export type Database = {
           endereco?: string | null
           etapa?: string
           etapa_atualizada_em?: string | null
+          fotos_count?: number | null
           google_avaliacoes_count?: number | null
           google_avaliacoes_sem_resposta?: number | null
           google_rating?: number | null
@@ -270,9 +307,26 @@ export type Database = {
           observacoes?: string | null
           org_id?: string
           origem?: string | null
+          perfil_reivindicado?: boolean | null
           place_id?: string | null
+          proximo_contato?: string | null
           score?: number | null
+          site_analisado_em?: string | null
+          site_ano_rodape?: number | null
+          site_carregamento_ms?: number | null
+          site_detalhe?: string | null
+          site_dominio_gratuito?: boolean | null
+          site_https?: boolean | null
+          site_nota_celular?: number | null
+          site_plataforma?: string | null
+          site_responsivo?: boolean | null
+          site_status?: string | null
+          site_tem_whatsapp?: boolean | null
+          site_url?: string | null
+          site_url_final?: string | null
           telefone?: string | null
+          tem_descricao?: boolean | null
+          tem_horario?: boolean | null
           tem_site?: boolean | null
           temperatura?: string | null
         }
@@ -315,6 +369,44 @@ export type Database = {
           },
         ]
       }
+      modelos_mensagem: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          id: string
+          nome: string
+          ordem: number
+          org_id: string
+          texto: string
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          nome: string
+          ordem?: number
+          org_id?: string
+          texto: string
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          org_id?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modelos_mensagem_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizacoes: {
         Row: {
           criado_em: string
@@ -339,16 +431,7 @@ export type Database = {
     }
     Functions: {
       calcular_score_lead: {
-        Args: {
-          p_google_avaliacoes_count: number
-          p_google_avaliacoes_sem_resposta: number
-          p_google_rating: number
-          p_instagram_handle: string
-          p_instagram_seguidores: number
-          p_instagram_ultimo_post_dias: number
-          p_telefone: string
-          p_tem_site: boolean
-        }
+        Args: { l: Database["public"]["Tables"]["leads"]["Row"] }
         Returns: number
       }
     }

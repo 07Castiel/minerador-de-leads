@@ -23,6 +23,7 @@ import {
   NICHOS_SUGERIDOS,
   QUANTIDADES_SUGERIDAS,
   UFS,
+  encontrarCidade,
   estimarCustoUsd,
   validarNovaBusca,
   type FiltroSite,
@@ -33,10 +34,6 @@ import {
 import { cn } from "@/lib/utils"
 
 const NOTA_QUALQUER = "__qualquer__"
-
-function semAcento(texto: string): string {
-  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim()
-}
 
 type NovaBuscaFormProps = {
   enviando: boolean
@@ -63,7 +60,7 @@ export function NovaBuscaForm({ enviando, onSubmit }: NovaBuscaFormProps) {
     // Cidade precisa existir na lista do IBGE (evita busca em cidade digitada errada).
     let cidadeFinal = cidade
     if (cidades.data) {
-      const achada = cidades.data.find((c) => semAcento(c) === semAcento(cidade))
+      const achada = encontrarCidade(cidades.data, cidade)
       if (!achada) {
         toast.error(`"${cidade}" não está na lista de cidades de ${uf}. Escolha uma das sugestões.`)
         return
@@ -215,6 +212,13 @@ export function NovaBuscaForm({ enviando, onSubmit }: NovaBuscaFormProps) {
                   <SelectItem value="com_site">Só com site</SelectItem>
                 </SelectContent>
               </Select>
+              {filtros.site === "sem_site" && (
+                <p className="max-w-56 text-xs text-muted-foreground">
+                  O Apify conta Instagram como site, então quem só tem Instagram fica de fora. Para
+                  não perder esses, deixe &quot;Com ou sem site&quot; e filtre nos resultados — sai
+                  mais barato.
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -238,16 +242,22 @@ export function NovaBuscaForm({ enviando, onSubmit }: NovaBuscaFormProps) {
               </Select>
             </div>
 
-            <label htmlFor="ignorar-fechados" className="flex h-9 items-center gap-2 text-sm">
-              <input
-                id="ignorar-fechados"
-                type="checkbox"
-                className="size-4 accent-primary"
-                checked={filtros.ignorarFechados}
-                onChange={(e) => setFiltros({ ...filtros, ignorarFechados: e.target.checked })}
-              />
-              Ignorar fechados
-            </label>
+            <div className="flex flex-col gap-0.5">
+              <label htmlFor="ignorar-fechados" className="flex items-center gap-2 text-sm">
+                <input
+                  id="ignorar-fechados"
+                  type="checkbox"
+                  aria-describedby="ignorar-fechados-ajuda"
+                  className="size-4 accent-primary"
+                  checked={filtros.ignorarFechados}
+                  onChange={(e) => setFiltros({ ...filtros, ignorarFechados: e.target.checked })}
+                />
+                Completar com abertos
+              </label>
+              <p id="ignorar-fechados-ajuda" className="pl-6 text-xs text-muted-foreground">
+                Fechados são descartados de graça; marcando, o Apify busca outros no lugar.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">

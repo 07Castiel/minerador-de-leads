@@ -1,7 +1,7 @@
 import type { NovaBusca } from "@/lib/minerador/regras"
 import type { Busca } from "@/types/busca"
 
-async function chamarApi<T>(url: string, init?: RequestInit): Promise<T> {
+export async function chamarApi<T>(url: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(url, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },

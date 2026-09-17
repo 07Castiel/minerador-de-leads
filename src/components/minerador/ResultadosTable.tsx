@@ -1,9 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { CheckIcon, StarIcon, XIcon } from "lucide-react"
+import { StarIcon } from "lucide-react"
 
 import { EtapaBadge } from "@/components/leads/EtapaBadge"
+import { MotivosChips } from "@/components/leads/MotivosChips"
 import { TemperaturaBadge } from "@/components/leads/TemperaturaBadge"
 import {
   Table,
@@ -48,7 +49,7 @@ export function ResultadosTable({ leads, selecionados, onAlternar, onAlternarTod
             <TableHead>Nome</TableHead>
             <TableHead>Telefone</TableHead>
             <TableHead>Bairro</TableHead>
-            <TableHead>Site</TableHead>
+            <TableHead>Destaques</TableHead>
             <TableHead>Google</TableHead>
             <TableHead className="text-right">Score</TableHead>
             <TableHead>Temperatura</TableHead>
@@ -91,14 +92,8 @@ export function ResultadosTable({ leads, selecionados, onAlternar, onAlternarTod
                   </TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">{lead.telefone ?? "—"}</TableCell>
                   <TableCell>{lead.bairro ?? "—"}</TableCell>
-                  <TableCell>
-                    {lead.tem_site === null ? (
-                      <span className="text-muted-foreground">?</span>
-                    ) : lead.tem_site ? (
-                      <CheckIcon className="size-4 text-muted-foreground" aria-label="Tem site" />
-                    ) : (
-                      <XIcon className="size-4 text-destructive" aria-label="Sem site" />
-                    )}
+                  <TableCell className="min-w-48">
+                    <MotivosChips lead={lead} limite={3} />
                   </TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">
                     {lead.google_rating === null ? (
