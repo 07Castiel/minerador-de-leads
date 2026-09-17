@@ -47,7 +47,44 @@ export const TEXTOS_DAS_LACUNAS = {
     nenhuma: "o perfil ainda não tem avaliação",
     poucas: "o perfil quase não tem avaliação",
   },
-} as const
+} as const satisfies TextosDasLacunas
+
+// "Abordagem curta": mesma estrutura e mesma pergunta, só a observação mais enxuta.
+export const TEXTOS_CURTOS_DAS_LACUNAS = {
+  sem_site: "não tem site",
+  link_fora_do_site: {
+    whatsapp: "o link abre o WhatsApp",
+    redeSocial: "o link só vai pro {DESTINO}",
+    redeSocialSemNome: "o link só vai pra uma rede social",
+    pagina: "o link só vai pro {DESTINO}",
+    paginaDeLinksSemNome: "o link só vai pra uma página de links",
+    plataformaSemNome: "o link só vai pra outro site",
+  },
+  poucas_fotos: {
+    nenhuma: "não tem foto no perfil",
+    uma: "tem só 1 foto",
+    varias: "tem só {N} fotos",
+  },
+  pouca_avaliacao: {
+    nenhuma: "não tem avaliação",
+    poucas: "quase não tem avaliação",
+  },
+} as const satisfies TextosDasLacunas
+
+export type TextosDasLacunas = {
+  sem_site: string
+  link_fora_do_site: {
+    whatsapp: string
+    redeSocial: string
+    redeSocialSemNome: string
+    pagina: string
+    paginaDeLinksSemNome: string
+    plataformaSemNome: string
+    perguntaQuandoPagina?: Partial<Record<string, string>>
+  }
+  poucas_fotos: { nenhuma: string; uma: string; varias: string }
+  pouca_avaliacao: { nenhuma: string; poucas: string }
+}
 
 // {DESTINO} pelo domínio do link. Sem nome aqui, vale o texto "SemNome".
 export const NOMES_DE_DESTINO: readonly (readonly [dominio: string, nome: string])[] = [

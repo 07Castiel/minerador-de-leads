@@ -2,17 +2,42 @@ import { describe, expect, it, vi } from "vitest"
 
 import {
   escolherLacuna,
+  mensagemDeRetorno,
   mensagemFixa,
   prepararAbordagem,
   redigirAbordagem,
   resolverNicho,
   saudacaoDoHorario,
+  validarConteudo,
   validarMensagem,
   type CamposDaAbordagem,
   type DadosDaAbordagem,
   type OpcoesDaAbordagem,
 } from "@/lib/leads/abordagem"
-import { NICHOS, NICHO_PADRAO, TERMOS_DE_OFERTA } from "@/lib/leads/abordagemConfig"
+import {
+  NICHOS,
+  NICHO_PADRAO,
+  TERMOS_BLOQUEADOS,
+  TERMOS_BLOQUEADOS_POR_NICHO,
+} from "@/lib/leads/abordagemConfig"
+import leadsReais from "@/lib/leads/fixtures/leads-reais.json"
+
+// Mensagens reais geradas pelo fluxo antigo pro lead LUIZ CARLOS SILVA ADVOCACIA
+// (Centro, Sobral, advocacia, lacuna sem site).
+const FIXTURE_1 = `Bom dia! Falo com Luiz Carlos Silva Advocacia?
+
+Encontrei vocês no Google e vi que ainda não têm um site. Eu crio sites para negócios aqui de Sobral, e um site bem feito costuma trazer cliente novo que hoje procura e não acha.
+
+Posso te mandar uma ideia de como ficaria o de vocês?`
+
+const FIXTURE_2 =
+  "Bom dia! Encontrei Luiz Carlos Silva Advocacia no Google e vi que ainda não têm um site. Trabalho criando sites, posso te mostrar uma ideia rápida pra vocês?"
+
+const FIXTURE_3 =
+  "Bom dia! Tudo bem? Passando pra saber se você conseguiu ver minha mensagem sobre o site de Luiz Carlos Silva Advocacia. Se fizer sentido, te mando alguns sites que já fiz aqui em Sobral."
+
+const FIXTURE_4 =
+  "Bom dia, tudo bem? É do escritório do Dr. Luiz Carlos, aí do Centro de Sobral? Achei vocês no Google e vi que o pessoal avalia super bem o atendimento. Eu trabalho criando sites pra advogados e fiquei na dúvida se vocês já têm uma página própria pro cliente agendar consulta ou se resolvem tudo pelo WhatsApp mesmo. Quem é que cuida dessa parte de internet aí com vocês?"
 
 // Lead sem nenhuma lacuna da abordagem.
 const OK: CamposDaAbordagem = {
@@ -353,6 +378,8 @@ describe("âncora", () => {
 describe("validarMensagem", () => {
   const d = dados(SEM_LINK)
   const valida = mensagemFixa(d)
+  // Põe o trecho no meio da mensagem, sem mudar o número de linhas.
+  const comTrecho = (trecho: string) => valida.replace("só o telefone.", `só o telefone. ${trecho}`)
 
   it("mensagem fixa passa, e 'site' como fato é permitido", () => {
     expect(valida).toContain("não tem site")
@@ -363,29 +390,8 @@ describe("validarMensagem", () => {
     expect(validarMensagem(`Tudo bem? ${valida}`, d)).toContain("mais_de_uma_pergunta")
   })
 
-  it.each([
-    ["Eu crio sites pra escritórios.", "oferta:eu crio"],
-    ["eu faço isso rápido.", "oferta:eu faço"],
-    ["Eu FACO isso.", "oferta:eu faço"],
-    ["Posso desenvolver algo pra vocês.", "oferta:posso desenvolver"],
-    ["Mando um orcamento.", "oferta:orçamento"],
-    ["Mando uns orçamentos.", "oferta:orçamento"],
-    ["Sai por R$ 500.", "oferta:R$"],
-    ["Olha https://exemplo.com", "oferta:http"],
-  ])("oferta: %s", (trecho, motivo) => {
-    expect(validarMensagem(`${valida} ${trecho}`, d)).toContain(motivo)
-  })
-
-  it("todos os termos de oferta do config têm teste acima", () => {
-    expect(TERMOS_DE_OFERTA).toEqual(["eu crio", "eu faço", "posso desenvolver", "orçamento", "R$", "http"])
-  })
-
-  it("termo no meio de outra palavra não conta", () => {
-    expect(validarMensagem(`${valida} Leu crio`, d)).not.toContain("oferta:eu crio")
-  })
-
   it("passa de 400 caracteres", () => {
-    expect(validarMensagem(`${valida} ${"a".repeat(400)}`, d)).toContain("passa_de_400_caracteres")
+    expect(validarMensagem(comTrecho("a".repeat(400)), d)).toContain("passa_de_400_caracteres")
   })
 
   it("sem o nome do negócio (maiúsculas não importam)", () => {
@@ -393,28 +399,200 @@ describe("validarMensagem", () => {
     expect(validarMensagem(valida.replace("Silva Advocacia", "SILVA ADVOCACIA"), d)).toEqual([])
   })
 
-  it("pergunta do nicho tem que estar literal (quebra de linha não importa)", () => {
+  it("pergunta do nicho tem que estar literal (espaço repetido não importa)", () => {
     expect(validarMensagem(valida.replace("cai direto no WhatsApp", "vai pro WhatsApp"), d)).toContain(
       "sem_pergunta_do_nicho"
     )
-    expect(validarMensagem(valida.replace("por lá cai", "por lá\ncai"), d)).toEqual([])
+    expect(validarMensagem(valida.replace("por lá cai", "por lá  cai"), d)).toEqual([])
   })
 
-  it("emoji, markdown e elogio", () => {
+  it("emoji e markdown", () => {
     expect(validarMensagem(valida.replace("Bom dia!", "Bom dia! 🙂"), d)).toEqual(["emoji"])
     expect(validarMensagem(valida.replace("Silva Advocacia", "*Silva Advocacia*"), d)).toContain("markdown")
-    expect(validarMensagem(`Parabéns pelo trabalho! ${valida}`, d)).toContain("elogio:parabéns")
   })
 
   it("vazia", () => {
     expect(validarMensagem("  ", d)).toEqual(["vazia"])
+  })
+
+  describe("(a) marcas de IA", () => {
+    it.each([
+      ["—", "marca_de_ia:travessão"],
+      ["–", "marca_de_ia:meia-risca"],
+      ["…", "marca_de_ia:reticências"],
+      ["...", "marca_de_ia:reticências"],
+    ])("%s", (marca, motivo) => {
+      expect(validarMensagem(comTrecho(`Vi ${marca} de novo.`), d)).toEqual([motivo])
+    })
+
+    it("mais de 2 quebras de linha", () => {
+      expect(validarMensagem(`${valida}\nAbraço.`, d)).toEqual(["marca_de_ia:mais_de_2_quebras"])
+    })
+
+    it("linha em branco entre linhas de texto", () => {
+      expect(validarMensagem(valida.replace("Sobral.\n", "Sobral.\n\n"), d)).toContain("marca_de_ia:linha_em_branco")
+      expect(validarMensagem(valida.replace("Sobral.\n", "Sobral.\n  \n"), d)).toContain("marca_de_ia:linha_em_branco")
+    })
+
+    it("quebra no fim e hífen comum não contam", () => {
+      expect(validarMensagem(`${valida}\n`, d)).toEqual([])
+      expect(validarMensagem(comTrecho("Advocacia-Especialista."), d)).toEqual([])
+    })
+  })
+
+  // Cada termo do config numa frase natural. Sem acento e sem caixa, por início de palavra.
+  const CASOS: Record<string, [frase: string, termo: string][]> = {
+    oferta: [
+      ["Eu crio isso pra escritórios.", "eu crio"],
+      ["EU FACO isso rápido.", "eu faço"],
+      ["Crio sites pra advogados.", "crio sites"],
+      ["Trabalho criando páginas.", "trabalho criando"],
+      ["Posso desenvolver algo pra vocês.", "posso desenvolver"],
+      ["Posso criar uma página.", "posso criar"],
+      ["Faco sites pra advogados.", "faço sites"],
+      ["Monto a página de vocês.", "monto"],
+      ["Desenvolvo isso há anos.", "desenvolvo"],
+      ["Mando uns orcamentos.", "orçamento"],
+      ["Sai por R$ 500.", "R$"],
+      ["Olha https://exemplo.com.", "http"],
+    ],
+    permissao: [
+      ["Posso te mandar uma ideia.", "posso te mandar"],
+      ["Posso te mostrar como fica.", "posso te mostrar"],
+      ["Posso mandar um exemplo.", "posso mandar"],
+      ["Te mando uns modelos.", "te mando"],
+      ["Te mostro rapidinho.", "te mostro"],
+      ["Quer que eu faça um teste.", "quer que eu"],
+      ["Você gostaria de ver.", "gostaria de ver"],
+      ["Se fizer sentido, a gente conversa.", "se fizer sentido"],
+    ],
+    promessa: [
+      ["Isso ajuda a trazer cliente.", "trazer cliente"],
+      ["Dá pra ter mais clientes.", "mais clientes"],
+      ["Chegam novos clientes.", "novos clientes"],
+      ["Isso pode aumentar a procura.", "aumentar"],
+      ["Com isso vai vender mais.", "vai vender mais"],
+      ["Um site costuma trazer gente nova.", "costuma trazer"],
+    ],
+    elogio: [
+      ["Excelente atendimento o de vocês.", "excelente atendimento"],
+      ["Parabéns pelo trabalho.", "parabéns"],
+      ["Um escritório incrível.", "incrível"],
+      ["Adorei o perfil.", "adorei"],
+      ["Perfil top.", "top"],
+    ],
+    advocacia: [
+      ["O cliente pode agendar consulta.", "agendar consulta"],
+      ["Facilita o agendamento.", "agendamento"],
+      ["O pessoal avalia bem vocês.", "avalia bem"],
+      ["O pessoal avalia super bem.", "avalia super bem"],
+      ["Vocês têm avaliacoes otimas.", "avaliações ótimas"],
+      ["Vi as boas avaliações.", "boas avaliações"],
+    ],
+  }
+  const REGRAS = [
+    ["(b) verbo de oferta em 1ª pessoa", "oferta"],
+    ["(c) fechamento pedindo permissão", "permissao"],
+    ["(d) promessa de resultado", "promessa"],
+    ["(e) só na advocacia", "advocacia"],
+    ["(f) elogio", "elogio"],
+  ] as const
+
+  describe.each(REGRAS)("%s", (_, grupo) => {
+    it.each(CASOS[grupo])("%s", (frase, termo) => {
+      expect(validarMensagem(comTrecho(frase), d)).toContain(`${grupo}:${termo}`)
+    })
+
+    it("todo termo do config tem caso", () => {
+      const doConfig = grupo === "advocacia" ? TERMOS_BLOQUEADOS_POR_NICHO.advocacia : TERMOS_BLOQUEADOS[grupo]
+      expect(CASOS[grupo].map(([, termo]) => termo)).toEqual(doConfig)
+    })
+  })
+
+  it("termo no meio de outra palavra não conta", () => {
+    expect(validarMensagem(comTrecho("Leu crio."), d)).toEqual([])
+    expect(validarMensagem(comTrecho("Desmonto tudo."), d)).toEqual([])
+  })
+
+  it("(e) vale só na advocacia", () => {
+    expect(validarConteudo("Facilita o agendamento.", "advocacia")).toEqual(["advocacia:agendamento"])
+    expect(validarConteudo("Facilita o agendamento.", "agendamento")).toEqual([])
+    expect(validarConteudo("Facilita o agendamento.")).toEqual([])
+  })
+})
+
+describe("fixtures reais (bloqueadas)", () => {
+  // LUIZ CARLOS SILVA ADVOCACIA, Centro, Sobral, advocacia, lacuna 1a
+  const d = dados({ ...SEM_LINK, nome: "LUIZ CARLOS SILVA ADVOCACIA", categoria: "Advogado", bairro: "Centro", cidade: "Sobral" })
+  const motivos = (texto: string) => [...validarMensagem(texto, d)].sort()
+
+  it("o lead das fixtures é advocacia, lacuna sem site, citando Luiz Carlos", () => {
+    expect(d).toMatchObject({ nicho: "advocacia", lacuna: "sem_site", referencia: "Luiz Carlos" })
+  })
+
+  it("1: modelo salvo 'primeira abordagem'", () => {
+    expect(motivos(FIXTURE_1)).toEqual(
+      [
+        "oferta:eu crio",
+        "oferta:crio sites",
+        "promessa:trazer cliente",
+        "promessa:costuma trazer",
+        "permissao:posso te mandar",
+        "mais_de_uma_pergunta",
+        "marca_de_ia:linha_em_branco",
+        "marca_de_ia:mais_de_2_quebras",
+        "sem_pergunta_do_nicho",
+      ].sort()
+    )
+  })
+
+  it("2: modelo salvo 'abordagem curta'", () => {
+    expect(motivos(FIXTURE_2)).toEqual(
+      ["oferta:trabalho criando", "permissao:posso te mostrar", "sem_pergunta_do_nicho"].sort()
+    )
+  })
+
+  it("3: modelo salvo 'retorno' (tem uma interrogação só, 'Tudo bem?')", () => {
+    expect(motivos(FIXTURE_3)).toEqual(
+      ["permissao:se fizer sentido", "permissao:te mando", "sem_pergunta_do_nicho"].sort()
+    )
+  })
+
+  it("4: Gemini do fluxo antigo, que abriu com avaliação num lead sem site", () => {
+    expect(motivos(FIXTURE_4)).toEqual(
+      [
+        "advocacia:avalia super bem",
+        "advocacia:agendar consulta",
+        "oferta:trabalho criando",
+        "mais_de_uma_pergunta",
+        "sem_pergunta_do_nicho",
+      ].sort()
+    )
+  })
+})
+
+describe("modelos que eram salvos no banco", () => {
+  const d = dados({ ...SEM_LINK, nome: "LUIZ CARLOS SILVA ADVOCACIA", categoria: "Advogado", bairro: "Centro", cidade: "Sobral" })
+
+  it("abordagem curta: mesma estrutura e mesma pergunta, observação enxuta", () => {
+    expect(mensagemFixa(d, "curta")).toBe(
+      "Bom dia! Aqui é o Leonardo, de Sobral.\n" +
+        "Procurei o escritório de Luiz Carlos no Google e achei, mas não tem site.\n" +
+        "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?"
+    )
+    expect(validarMensagem(mensagemFixa(d, "curta"), d)).toEqual([])
+  })
+
+  it("retorno: texto único, sem emoji, e passa nas regras de conteúdo", () => {
+    expect(mensagemDeRetorno()).toBe("Oi! Só confirmando se essa mensagem chegou.")
+    expect(validarConteudo(mensagemDeRetorno(), "advocacia")).toEqual([])
   })
 })
 
 describe("redigirAbordagem", () => {
   const d = dados(SEM_LINK)
   const valida = mensagemFixa(d).replace("Procurei", "Pesquisei")
-  const invalida = `Eu crio sites! ${valida}`
+  const invalida = `Eu crio isso pra vocês! ${valida}`
 
   it("Gemini válido de primeira", async () => {
     const redigir = vi.fn().mockResolvedValue(`  ${valida}\n`)
@@ -450,6 +628,18 @@ describe("redigirAbordagem", () => {
     const r = await redigirAbordagem(d, redigir)
     expect(r).toMatchObject({ tipo: "pronta", origem: "fixa", texto: mensagemFixa(d) })
     expect(r.bloqueios.map((b) => b.motivos)).toEqual([["erro: 503 alta demanda"], ["erro: 503 alta demanda"]])
+  })
+
+  it("Gemini inventando gancho (fixture 4) num lead sem site: bloqueado, retry, texto fixo com o motivo", async () => {
+    const luiz = dados({ ...SEM_LINK, nome: "LUIZ CARLOS SILVA ADVOCACIA", categoria: "Advogado", cidade: "Sobral" })
+    const redigir = vi.fn().mockResolvedValue(FIXTURE_4)
+    const r = await redigirAbordagem(luiz, redigir)
+    expect(redigir).toHaveBeenCalledTimes(2)
+    expect(r).toMatchObject({ tipo: "pronta", origem: "fixa", texto: mensagemFixa(luiz) })
+    expect(r.bloqueios).toHaveLength(2)
+    for (const bloqueio of r.bloqueios) {
+      expect(bloqueio.motivos).toEqual(expect.arrayContaining(["advocacia:avalia super bem", "advocacia:agendar consulta"]))
+    }
   })
 
   it("nem a fixa passa: abordagem manual", async () => {
@@ -493,16 +683,58 @@ describe("config", () => {
     expect(Object.keys(CATEGORIA_DO_NICHO).sort()).toEqual([...NICHOS, NICHO_PADRAO].map((n) => n.id).sort())
   })
 
-  it("a mensagem fixa de toda combinação permitida passa na validação, em 3 linhas", () => {
+  it("a mensagem fixa (completa e curta) de toda combinação permitida passa na validação, em 3 linhas", () => {
     for (const nicho of [...NICHOS, NICHO_PADRAO]) {
       const variantes = nicho.comercio ? [...DO_SITE, ...DE_COMERCIO] : DO_SITE
       for (const variante of variantes) {
         const d = dados({ ...LONGO, categoria: CATEGORIA_DO_NICHO[nicho.id], ...variante })
-        const texto = mensagemFixa(d)
-        expect({ texto, motivos: validarMensagem(texto, d) }).toEqual({ texto, motivos: [] })
-        expect(texto.split("\n")).toHaveLength(3)
-        expect(texto).not.toMatch(/[—–]|\n\s*\n/)
+        for (const formato of ["completa", "curta"] as const) {
+          const texto = mensagemFixa(d, formato)
+          expect({ texto, motivos: validarMensagem(texto, d) }).toEqual({ texto, motivos: [] })
+          expect(texto.split("\n")).toHaveLength(3)
+          expect(texto).not.toMatch(/[—–…]|\.\.\.|\n\s*\n/)
+        }
       }
     }
+  })
+})
+
+describe("os 100 leads reais", () => {
+  type LeadReal = CamposDaAbordagem & { termo_da_busca: string | null }
+  const leads = leadsReais as unknown as LeadReal[]
+  // 10h, 14h e 19h em Fortaleza: as três saudações
+  const HORARIOS = ["2026-09-18T13:00:00Z", "2026-09-18T17:00:00Z", "2026-09-18T22:00:00Z"].map((iso) => new Date(iso))
+
+  it("são os 100 do banco", () => {
+    expect(leads).toHaveLength(100)
+  })
+
+  it("nenhuma mensagem regenerada cai em regra nenhuma, nem tem travessão, linha em branco ou 2 perguntas", () => {
+    const problemas: { nome: string; texto: string; motivos: string[] }[] = []
+    for (const lead of leads) {
+      for (const agora of HORARIOS) {
+        const r = prepararAbordagem(lead, agora, { termoDaBusca: lead.termo_da_busca })
+        if (r.tipo !== "pronta") continue
+        for (const formato of ["completa", "curta"] as const) {
+          const texto = mensagemFixa(r.dados, formato)
+          const motivos = validarMensagem(texto, r.dados)
+          if (/[—–…]|\.\.\./.test(texto)) motivos.push("travessão ou reticências")
+          if (/\n\s*\n/.test(texto)) motivos.push("linha em branco")
+          if ((texto.match(/\?/g) ?? []).length > 1) motivos.push("mais de uma ?")
+          if (motivos.length > 0) problemas.push({ nome: lead.nome, texto, motivos })
+        }
+      }
+    }
+    expect(problemas).toEqual([])
+  })
+
+  it("distribuição de hoje: 28 sem site, 20 link fora do site, 52 manuais", () => {
+    const contagem: Record<string, number> = {}
+    for (const lead of leads) {
+      const r = prepararAbordagem(lead, HORARIOS[0], { termoDaBusca: lead.termo_da_busca })
+      const chave = r.tipo === "pronta" ? r.dados.lacuna : r.tipo
+      contagem[chave] = (contagem[chave] ?? 0) + 1
+    }
+    expect(contagem).toEqual({ sem_site: 28, link_fora_do_site: 20, manual: 52 })
   })
 })

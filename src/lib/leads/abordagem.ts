@@ -7,20 +7,25 @@
 import {
   ANCORA_PADRAO,
   CATEGORIAS_GENERICAS,
+  FOLLOW_UP,
   FUSO_DA_ABORDAGEM,
   LACUNAS_DA_ABORDAGEM,
   LACUNAS_SO_DE_COMERCIO,
   LIMITES,
+  LIMITES_DE_LINHA,
+  MARCAS_DE_IA,
   MENSAGEM_FIXA,
   NICHOS,
   NICHO_PADRAO,
   NOMES_DE_DESTINO,
   SAUDACOES,
-  TERMOS_DE_ELOGIO,
-  TERMOS_DE_OFERTA,
+  TERMOS_BLOQUEADOS,
+  TERMOS_BLOQUEADOS_POR_NICHO,
+  TEXTOS_CURTOS_DAS_LACUNAS,
   TEXTOS_DAS_LACUNAS,
   type LacunaDaAbordagem,
   type NichoDaAbordagem,
+  type TextosDasLacunas,
 } from "@/lib/leads/abordagemConfig"
 import { lacunasDoLead, nomeCurto, type CamposDoModelo, type LacunaDoLead } from "@/lib/leads/modelosMensagem"
 import { pessoaDoNome } from "@/lib/leads/pessoaDoNome"
@@ -44,6 +49,8 @@ export type DadosDaAbordagem = {
   tratamento: "você" | "vocês"
   // A observação inteira, já com {N} e {DESTINO} trocados: "não tem site, só o telefone"
   textoDaLacuna: string
+  // A mesma observação, enxuta, pra "abordagem curta": "não tem site"
+  textoCurtoDaLacuna: string
   pergunta: string
 }
 
@@ -127,8 +134,10 @@ function nomeDoDestino(url: string): string | null {
   return (host && NOMES_DE_DESTINO.find(([dominio]) => pertenceA(host, [dominio]))?.[1]) || null
 }
 
-function textoDoLink(lacuna: Extract<LacunaDoLead, { id: "link_fora_do_site" }>): string {
-  const textos = TEXTOS_DAS_LACUNAS.link_fora_do_site
+function textoDoLink(
+  lacuna: Extract<LacunaDoLead, { id: "link_fora_do_site" }>,
+  textos: TextosDasLacunas["link_fora_do_site"]
+): string {
   if (lacuna.destino === "whatsapp") return textos.whatsapp
   const destino = nomeDoDestino(lacuna.url)
   if (lacuna.destino === "instagram" || lacuna.destino === "rede_social") {
@@ -138,22 +147,18 @@ function textoDoLink(lacuna: Extract<LacunaDoLead, { id: "link_fora_do_site" }>)
   return lacuna.destino === "pagina_de_links" ? textos.paginaDeLinksSemNome : textos.plataformaSemNome
 }
 
-function textoDaLacuna(lacuna: LacunaDaAbordagemDoLead): string {
+function textoDaLacuna(lacuna: LacunaDaAbordagemDoLead, textos: TextosDasLacunas): string {
   switch (lacuna.id) {
     case "sem_site":
-      return TEXTOS_DAS_LACUNAS.sem_site
+      return textos.sem_site
     case "link_fora_do_site":
-      return textoDoLink(lacuna)
-    case "poucas_fotos": {
-      const textos = TEXTOS_DAS_LACUNAS.poucas_fotos
-      if (lacuna.fotos === 0) return textos.nenhuma
-      if (lacuna.fotos === 1) return textos.uma
-      return preencher(textos.varias, { N: String(lacuna.fotos) })
-    }
-    case "pouca_avaliacao": {
-      const textos = TEXTOS_DAS_LACUNAS.pouca_avaliacao
-      return lacuna.avaliacoes === 0 ? textos.nenhuma : textos.poucas
-    }
+      return textoDoLink(lacuna, textos.link_fora_do_site)
+    case "poucas_fotos":
+      if (lacuna.fotos === 0) return textos.poucas_fotos.nenhuma
+      if (lacuna.fotos === 1) return textos.poucas_fotos.uma
+      return preencher(textos.poucas_fotos.varias, { N: String(lacuna.fotos) })
+    case "pouca_avaliacao":
+      return lacuna.avaliacoes === 0 ? textos.pouca_avaliacao.nenhuma : textos.pouca_avaliacao.poucas
   }
 }
 
@@ -209,20 +214,27 @@ export function prepararAbordagem(
       nicho: nicho.id,
       saudacao,
       ...ancoraDoLead(lead, nicho),
-      textoDaLacuna: textoDaLacuna(lacuna),
+      textoDaLacuna: textoDaLacuna(lacuna, TEXTOS_DAS_LACUNAS),
+      textoCurtoDaLacuna: textoDaLacuna(lacuna, TEXTOS_CURTOS_DAS_LACUNAS),
       pergunta: perguntaDaLacuna(lacuna, nicho),
     },
   }
 }
 
-// Mensagem sem LLM: a estrutura do config com os dados já resolvidos.
-export function mensagemFixa(dados: DadosDaAbordagem): string {
+// Mensagem sem LLM: a estrutura do config com os dados já resolvidos. "curta"
+// (antigo modelo "Abordagem curta") só troca a observação pela versão enxuta.
+export function mensagemFixa(dados: DadosDaAbordagem, formato: "completa" | "curta" = "completa"): string {
   return preencher(MENSAGEM_FIXA, {
     SAUDACAO: dados.saudacao,
     ANCORA: dados.ancora,
-    LACUNA: dados.textoDaLacuna,
+    LACUNA: formato === "curta" ? dados.textoCurtoDaLacuna : dados.textoDaLacuna,
     PERGUNTA: dados.pergunta,
   })
+}
+
+// Antigo modelo "Retorno": o follow-up único, texto fixo do config.
+export function mensagemDeRetorno(): string {
+  return FOLLOW_UP.texto
 }
 
 // Termo no início de palavra: "orçamentos" bloqueia, "meu crio" não conta como "eu crio".
@@ -236,28 +248,55 @@ function juntarEspacos(texto: string): string {
   return texto.normalize("NFC").replace(/\s+/g, " ").trim()
 }
 
-// Camada 3: lista vazia = pode enviar. Cada item vira o motivo registrado do bloqueio.
-export function validarMensagem(texto: string, dados: Pick<DadosDaAbordagem, "referencia" | "pergunta">): string[] {
-  const motivos: string[] = []
+// Regras que valem pra qualquer texto que vai pro WhatsApp, inclusive o retorno
+// (que não tem nome nem pergunta). Lista vazia = pode enviar; cada item vira o
+// motivo registrado do bloqueio.
+export function validarConteudo(texto: string, nicho: string | null = null): string[] {
   if (!texto.trim()) return ["vazia"]
-
-  if ((texto.match(/\?/g) ?? []).length > 1) motivos.push("mais_de_uma_pergunta")
-  const normalizado = normalizar(texto)
-  for (const termo of TERMOS_DE_OFERTA) {
-    if (contemTermo(normalizado, termo)) motivos.push(`oferta:${termo}`)
+  const motivos: string[] = []
+  const adicionar = (motivo: string) => {
+    if (!motivos.includes(motivo)) motivos.push(motivo)
   }
-  if (texto.length > LIMITES.caracteres) motivos.push(`passa_de_${LIMITES.caracteres}_caracteres`)
-  if (!juntarEspacos(texto).toLocaleLowerCase("pt-BR").includes(juntarEspacos(dados.referencia).toLocaleLowerCase("pt-BR"))) {
+
+  // (a) marcas de IA
+  for (const [trecho, nome] of MARCAS_DE_IA) {
+    if (texto.includes(trecho)) adicionar(`marca_de_ia:${nome}`)
+  }
+  const quebras = (texto.trim().match(/\n/g) ?? []).length
+  if (quebras > LIMITES_DE_LINHA.quebras) adicionar(`marca_de_ia:mais_de_${LIMITES_DE_LINHA.quebras}_quebras`)
+  if (/\n[^\S\n]*\n/.test(texto.trim())) adicionar("marca_de_ia:linha_em_branco")
+
+  if ((texto.match(/\?/g) ?? []).length > 1) adicionar("mais_de_uma_pergunta")
+  if (texto.length > LIMITES.caracteres) adicionar(`passa_de_${LIMITES.caracteres}_caracteres`)
+  if (/\p{Extended_Pictographic}/u.test(texto)) adicionar("emoji")
+  if (/[*_`#]|^\s*[-•]\s/m.test(texto)) adicionar("markdown")
+
+  // (b) oferta, (c) permissão, (d) promessa, (f) elogio; (e) termos do nicho
+  const normalizado = normalizar(texto)
+  const grupos: [string, readonly string[]][] = Object.entries(TERMOS_BLOQUEADOS)
+  const doNicho = nicho ? TERMOS_BLOQUEADOS_POR_NICHO[nicho] : undefined
+  if (nicho && doNicho) grupos.push([nicho, doNicho])
+  for (const [grupo, termos] of grupos) {
+    for (const termo of termos) {
+      if (contemTermo(normalizado, termo)) adicionar(`${grupo}:${termo}`)
+    }
+  }
+  return motivos
+}
+
+// Camada 3 da abordagem: as regras de conteúdo, mais citar o nome e terminar na pergunta decidida.
+export function validarMensagem(
+  texto: string,
+  dados: Pick<DadosDaAbordagem, "referencia" | "pergunta" | "nicho">
+): string[] {
+  const motivos = validarConteudo(texto, dados.nicho)
+  if (motivos.includes("vazia")) return motivos
+
+  const junto = juntarEspacos(texto)
+  if (!junto.toLocaleLowerCase("pt-BR").includes(juntarEspacos(dados.referencia).toLocaleLowerCase("pt-BR"))) {
     motivos.push("sem_nome_do_negocio")
   }
-  if (!juntarEspacos(texto).includes(juntarEspacos(dados.pergunta))) motivos.push("sem_pergunta_do_nicho")
-
-  // Restrições do prompt que também dá pra conferir em código
-  if (/\p{Extended_Pictographic}/u.test(texto)) motivos.push("emoji")
-  if (/[*_`#]|^\s*[-•]\s/m.test(texto)) motivos.push("markdown")
-  for (const termo of TERMOS_DE_ELOGIO) {
-    if (contemTermo(normalizado, termo)) motivos.push(`elogio:${termo}`)
-  }
+  if (!junto.includes(juntarEspacos(dados.pergunta))) motivos.push("sem_pergunta_do_nicho")
   return motivos
 }
 

@@ -33,13 +33,70 @@ export const ANCORA_PADRAO = "Procurei {NEGOCIO} no Google e achei"
 // que se escreve no WhatsApp.
 export const MENSAGEM_FIXA = "{SAUDACAO} Aqui é o Leonardo, de Sobral.\n{ANCORA}, mas {LACUNA}.\n{PERGUNTA}"
 
-// Bloqueiam a mensagem. Comparação sem acento e sem diferença de maiúsculas,
-// a partir do início de uma palavra ("orçamentos" também bloqueia).
-export const TERMOS_DE_OFERTA = ["eu crio", "eu faço", "posso desenvolver", "orçamento", "R$", "http"] as const
-export const TERMOS_DE_ELOGIO = ["parabéns", "incrível", "adorei"] as const
+// Marcas de texto de IA. Além destes caracteres, bloqueia linha em branco e mais
+// de LIMITES_DE_LINHA.quebras quebras de linha.
+export const MARCAS_DE_IA: readonly (readonly [trecho: string, nome: string])[] = [
+  ["—", "travessão"],
+  ["–", "meia-risca"],
+  ["…", "reticências"],
+  ["...", "reticências"],
+]
+
+export const LIMITES_DE_LINHA = { quebras: 2 } as const
+
+// Bloqueiam a mensagem, em qualquer nicho. Comparação sem acento e sem diferença
+// de maiúsculas, a partir do início de uma palavra ("orçamentos" também bloqueia).
+// O motivo registrado é "{grupo}:{termo}".
+export const TERMOS_BLOQUEADOS = {
+  // Verbo de oferta em 1ª pessoa, e preço/link, que também são oferta
+  oferta: [
+    "eu crio",
+    "eu faço",
+    "crio sites",
+    "trabalho criando",
+    "posso desenvolver",
+    "posso criar",
+    "faço sites",
+    "monto",
+    "desenvolvo",
+    "orçamento",
+    "R$",
+    "http",
+  ],
+  // Fechamento pedindo permissão: pergunta de sim/não em que o silêncio é a
+  // saída fácil, e trabalho de graça antes de existir interesse
+  permissao: [
+    "posso te mandar",
+    "posso te mostrar",
+    "posso mandar",
+    "te mando",
+    "te mostro",
+    "quer que eu",
+    "gostaria de ver",
+    "se fizer sentido",
+  ],
+  // Promessa de resultado
+  promessa: ["trazer cliente", "mais clientes", "novos clientes", "aumentar", "vai vender mais", "costuma trazer"],
+  // Elogio. "top" por início de palavra também pega "topo" e "tópico".
+  elogio: ["excelente atendimento", "parabéns", "incrível", "adorei", "top"],
+} as const satisfies Record<string, readonly string[]>
+
+// Só num nicho. Advocacia: agendamento e avaliação de cliente como argumento
+// soam como captação de clientela, que o código de ética da OAB restringe.
+export const TERMOS_BLOQUEADOS_POR_NICHO: Partial<Record<string, readonly string[]>> = {
+  advocacia: [
+    "agendar consulta",
+    "agendamento",
+    "avalia bem",
+    "avalia super bem",
+    "avaliações ótimas",
+    "boas avaliações",
+  ],
+}
 
 // Uma mensagem só, 48h depois, se não houve resposta. Depois disso: perdido.
+// Sem emoji, sem re-venda, sem portfólio; passa pela mesma validação de conteúdo.
 export const FOLLOW_UP = {
   horasSemResposta: 48,
-  texto: "Oi! Só confirmando se essa mensagem chegou 👍",
+  texto: "Oi! Só confirmando se essa mensagem chegou.",
 } as const
