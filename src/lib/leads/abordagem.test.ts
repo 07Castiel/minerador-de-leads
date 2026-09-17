@@ -165,9 +165,9 @@ describe("lacunas", () => {
   })
 
   it.each([
-    ["https://www.instagram.com/silva.adv/", "o link vai pro Instagram, site não achei"],
-    ["https://facebook.com/silva.adv", "o link vai pro Facebook, site não achei"],
-    ["https://twitter.com/silva", "o link vai pra uma rede social, site não achei"],
+    ["https://www.instagram.com/silva.adv/", "o link vai pro Instagram, mas site não"],
+    ["https://facebook.com/silva.adv", "o link vai pro Facebook, mas site não"],
+    ["https://twitter.com/silva", "o link vai pra uma rede social, mas site não"],
     ["https://wa.link/abc123", "o link abre o WhatsApp direto, sem site"],
     ["https://linktr.ee/silva", "o link só vai pra uma página no Linktree"],
     ["https://eduardo.linkbio.co", "o link só vai pra uma página no Linkbio"],
@@ -179,6 +179,38 @@ describe("lacunas", () => {
     const d = dados(link(url))
     expect(d.lacuna).toBe("link_fora_do_site")
     expect(d.textoDaLacuna).toBe(texto)
+  })
+
+  describe("pergunta própria quando o link vai pra uma página", () => {
+    const PERGUNTA_DA_PAGINA = "Quem te procura por lá chega a ver suas áreas de atuação ou te chama direto?"
+    const PERGUNTA_DA_ADVOCACIA = "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?"
+
+    it.each(["https://linktr.ee/silva", "https://bio.link/silva", "https://silva.jusbrasil.com.br"])(
+      "advocacia, página de links ou diretório (%s): troca a pergunta",
+      (url) => {
+        expect(dados(link(url)).pergunta).toBe(PERGUNTA_DA_PAGINA)
+      }
+    )
+
+    it.each([SEM_LINK, link("https://instagram.com/silva"), link("https://wa.me/5588996123456")])(
+      "advocacia, demais lacunas: pergunta do nicho",
+      (lacuna) => {
+        expect(dados(lacuna).pergunta).toBe(PERGUNTA_DA_ADVOCACIA)
+      }
+    )
+
+    it("nicho sem pergunta própria pra página: fallback pra pergunta do nicho", () => {
+      expect(dados({ ...link("https://linktr.ee/doces"), categoria: "Confeitaria" }).pergunta).toBe(
+        "Como vocês tocam as encomendas hoje, tudo por aqui?"
+      )
+    })
+
+    it("a mensagem fixa termina na pergunta da lacuna e passa na validação", () => {
+      const d = dados(link("https://silva.jusbrasil.com.br"))
+      const texto = mensagemFixa(d)
+      expect(texto.split("\n").at(-1)).toBe(PERGUNTA_DA_PAGINA)
+      expect(validarMensagem(texto, d)).toEqual([])
+    })
   })
 
   it("site gratuito do Google desativado não é lacuna da abordagem", () => {

@@ -157,6 +157,14 @@ function textoDaLacuna(lacuna: LacunaDaAbordagemDoLead): string {
   }
 }
 
+// A lacuna pode trazer pergunta própria por nicho; sem ela, vale a do nicho.
+function perguntaDaLacuna(lacuna: LacunaDaAbordagemDoLead, nicho: NichoDaAbordagem): string {
+  const vaiPraPagina =
+    lacuna.id === "link_fora_do_site" && (lacuna.destino === "pagina_de_links" || lacuna.destino === "plataforma")
+  const propria = vaiPraPagina ? TEXTOS_DAS_LACUNAS.link_fora_do_site.perguntaQuandoPagina[nicho.id] : undefined
+  return propria ?? nicho.pergunta
+}
+
 export type AncoraDoLead = Pick<DadosDaAbordagem, "negocio" | "pessoa" | "ancora" | "referencia" | "tratamento">
 
 // "Procurei o escritório de Luiz Carlos no Google e achei" ou "Procurei Azevedo & Azevedo no Google e achei".
@@ -202,7 +210,7 @@ export function prepararAbordagem(
       saudacao,
       ...ancoraDoLead(lead, nicho),
       textoDaLacuna: textoDaLacuna(lacuna),
-      pergunta: nicho.pergunta,
+      pergunta: perguntaDaLacuna(lacuna, nicho),
     },
   }
 }

@@ -22,12 +22,18 @@ export const TEXTOS_DAS_LACUNAS = {
   // leads de hoje vão pro Instagram.
   link_fora_do_site: {
     whatsapp: "o link abre o WhatsApp direto, sem site",
-    redeSocial: "o link vai pro {DESTINO}, site não achei",
-    redeSocialSemNome: "o link vai pra uma rede social, site não achei",
+    redeSocial: "o link vai pro {DESTINO}, mas site não",
+    redeSocialSemNome: "o link vai pra uma rede social, mas site não",
     // página de links (Linktree...) ou diretório (Jusbrasil, iFood...)
     pagina: "o link só vai pra uma página no {DESTINO}",
     paginaDeLinksSemNome: "o link só vai pra uma página de links",
     plataformaSemNome: "o link só vai pra uma página de outro site",
+    // Pergunta própria (opcional, por nicho) quando o link vai pra uma página: a
+    // do nicho perguntaria por uma página que a observação acabou de citar.
+    // Sem entrada, vale a pergunta do nicho.
+    perguntaQuandoPagina: {
+      advocacia: "Quem te procura por lá chega a ver suas áreas de atuação ou te chama direto?",
+    } as Partial<Record<string, string>>,
   },
   // 2: pronto, mas ainda fora de LACUNAS_DA_ABORDAGEM
   perfil_sem_dono: "o perfil ainda não tem dono",
