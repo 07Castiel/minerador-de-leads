@@ -123,6 +123,33 @@ describe("resolverNicho", () => {
     ["Loja de roupas", "varejo"],
     ["Escritório da empresa", "outros"],
     [null, "outros"],
+    // Categorias que o Google deu na rodada do Ceará, cada uma no nicho-mãe
+    ["Dentista", "agendamento"],
+    ["Cirurgião dentista", "agendamento"],
+    ["Ortodontista", "agendamento"],
+    ["Manicure", "agendamento"],
+    ["Serviço de depilação a cera", "agendamento"],
+    ["Borracharia", "agendamento"],
+    ["Funilaria", "agendamento"],
+    ["Mecânico", "agendamento"],
+    ["Lava-rápido", "agendamento"],
+    ["Comércio de Pneu", "agendamento"],
+    ["Delivery de Pizza", "alimentacao"],
+    ["Fornecedor de materiais de construção", "varejo"],
+    ["Comércio de materiais de construção", "varejo"],
+    ["Construção", "varejo"],
+    ["Construtora", "varejo"],
+    ["Depósito", "varejo"],
+    ["Fabricante", "varejo"],
+    // Ficam de fora de propósito: não é o mesmo tipo de negócio dos nichos-mãe
+    ["Posto de combustível", "outros"],
+    ["Estacionamento", "outros"],
+    ["Feira de automóveis", "outros"],
+    ["Café", "outros"],
+    ["Bar", "outros"],
+    ["Supermercado", "outros"],
+    ["Mercado", "outros"],
+    ["Butique", "outros"],
   ])("categoria %s → %s", (categoria, nicho) => {
     expect(resolverNicho(categoria).id).toBe(nicho)
   })
@@ -141,7 +168,7 @@ describe("resolverNicho", () => {
   })
 
   it("3. nada casa: outros", () => {
-    expect(resolverNicho("Escritório da empresa", "Dentista").id).toBe("outros")
+    expect(resolverNicho("Escritório da empresa", "Pet shop").id).toBe("outros")
     expect(resolverNicho("Escritório da empresa").id).toBe("outros")
   })
 

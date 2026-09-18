@@ -51,20 +51,43 @@ export const NICHOS: readonly NichoDaAbordagem[] = [
       "bolo",
       "salgado",
       "marmita",
+      // "Delivery de Pizza" (cobre "Pizzaria" também)
+      "pizza",
     ],
     pergunta: "Como vocês tocam as encomendas hoje, tudo por aqui?",
     comercio: true,
   },
   {
     id: "agendamento",
-    termos: ["salao", "cabeleireir", "barbearia", "clinica", "oficina", "mecanica"],
+    termos: [
+      "salao",
+      "cabeleireir",
+      "barbearia",
+      "clinica",
+      "oficina",
+      "mecanica",
+      // Dentista, Cirurgião dentista, Ortodontista
+      "dentist",
+      "ortodont",
+      // Manicure e depilação: mesma agenda de horário marcado
+      "manicure",
+      "depilacao",
+      // Serviço de carro que trabalha por hora marcada, como a oficina
+      "mecanico",
+      "borracharia",
+      "funilaria",
+      "lava-rapido",
+      "lava rapido",
+      "pneu",
+    ],
     pergunta: "Os agendamentos ficam tudo no WhatsApp?",
     comercio: true,
   },
   {
     id: "varejo",
     rotulo: "Varejo",
-    termos: ["loja", "varejo", "boutique"],
+    // Material de construção vende por balcão e orçamento, como o resto do varejo
+    termos: ["loja", "varejo", "boutique", "construcao", "construtora", "deposito", "fabricante"],
     pergunta: "Quando perguntam preço você manda foto na hora?",
     comercio: true,
   },
