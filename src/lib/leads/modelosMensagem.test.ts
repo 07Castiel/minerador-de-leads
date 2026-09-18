@@ -57,8 +57,16 @@ describe("nomeCurto", () => {
     ["Clínica São José LTDA", "Clínica São José"],
     // emoji em qualquer posição
     ["Pizzaria 🍕 do Zé", "Pizzaria do Zé"],
+    // lista de serviços depois do nome, separada por vírgula
+    [
+      "Barber Shop Old Cut: Barbearia, Barbeiro, Hidratação, Fortaleza CE",
+      "Barber Shop Old Cut: Barbearia",
+    ],
+    ["Padaria e Confeitaria Pão Dourado, Sobral", "Padaria e Confeitaria Pão Dourado"],
     // corte que deixaria um termo só: fica o nome inteiro
     ["Mendes Advogados Associados", "Mendes Advogados Associados"],
+    // vírgula logo depois do primeiro termo não corta: sobraria "Garcia"
+    ["Garcia, Lima & Becco Advogados", "Garcia, Lima & Becco Advogados"],
     ["FORTALEZA ADVOGADOS ASSOCIADOS", "Fortaleza Advogados Associados"],
     ["Advocacia BMI", "Advocacia BMI"],
     ["Nayana", "Nayana"],
