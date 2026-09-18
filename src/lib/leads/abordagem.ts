@@ -288,10 +288,26 @@ function juntarEspacos(texto: string): string {
   return texto.normalize("NFC").replace(/\s+/g, " ").trim()
 }
 
+// Tira o nome do lead do texto antes das regras de escrita: o nome vem do
+// Google e a validação existe pra julgar o que a abordagem escreve. Sem isso,
+// "Barbearia_o_nony" vira markdown e "Oficina Mecânica Top Car" vira elogio.
+function semONomeDoLead(texto: string, nome: string | null): string {
+  const alvo = nome ? juntarEspacos(nome) : ""
+  if (alvo.length < 2) return texto
+  const escapado = alvo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")
+  return texto.replace(new RegExp(escapado, "gi"), " ")
+}
+
 // Regras que valem pra qualquer texto que vai pro WhatsApp, inclusive o retorno
 // (que não tem nome nem pergunta). Lista vazia = pode enviar; cada item vira o
-// motivo registrado do bloqueio.
-export function validarConteudo(texto: string, nicho: string | null = null): string[] {
+// motivo registrado do bloqueio. nomeDoLead sai das regras de escrita (markdown
+// e termos bloqueados); tamanho, emoji e marcas de IA continuam no texto inteiro,
+// porque valem para a mensagem como ela vai ser enviada.
+export function validarConteudo(
+  texto: string,
+  nicho: string | null = null,
+  nomeDoLead: string | null = null
+): string[] {
   if (!texto.trim()) return ["vazia"]
   const motivos: string[] = []
   const adicionar = (motivo: string) => {
@@ -309,10 +325,12 @@ export function validarConteudo(texto: string, nicho: string | null = null): str
   if ((texto.match(/\?/g) ?? []).length > 1) adicionar("mais_de_uma_pergunta")
   if (texto.length > LIMITES.caracteres) adicionar(`passa_de_${LIMITES.caracteres}_caracteres`)
   if (/\p{Extended_Pictographic}/u.test(texto)) adicionar("emoji")
-  if (/[*_`#]|^\s*[-•]\s/m.test(texto)) adicionar("markdown")
+
+  const escrito = semONomeDoLead(texto, nomeDoLead)
+  if (/[*_`#]|^\s*[-•]\s/m.test(escrito)) adicionar("markdown")
 
   // (b) oferta, (c) permissão, (d) promessa, (f) elogio; (e) termos do nicho
-  const normalizado = normalizar(texto)
+  const normalizado = normalizar(escrito)
   const grupos: [string, readonly string[]][] = Object.entries(TERMOS_BLOQUEADOS)
   const doNicho = nicho ? TERMOS_BLOQUEADOS_POR_NICHO[nicho] : undefined
   if (nicho && doNicho) grupos.push([nicho, doNicho])
@@ -329,7 +347,7 @@ export function validarMensagem(
   texto: string,
   dados: Pick<DadosDaAbordagem, "referencia" | "pergunta" | "nicho">
 ): string[] {
-  const motivos = validarConteudo(texto, dados.nicho)
+  const motivos = validarConteudo(texto, dados.nicho, dados.referencia)
   if (motivos.includes("vazia")) return motivos
 
   const junto = juntarEspacos(texto)

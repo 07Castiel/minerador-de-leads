@@ -486,6 +486,19 @@ describe("validarMensagem", () => {
     expect(validarMensagem("  ", d)).toEqual(["vazia"])
   })
 
+  // O nome vem do Google: "Barbearia_o_nony" não é formatação escrita pela
+  // abordagem, nem "Top Car" é elogio. Fora do nome, as duas regras seguem valendo.
+  it("nome do lead não dispara markdown nem elogio", () => {
+    const comUnderline = dados({ ...SEM_LINK, ...COMERCIO, nome: "Barbearia_o_nony" })
+    expect(validarMensagem(mensagemFixa(comUnderline), comUnderline)).toEqual([])
+
+    const comTop = dados({ ...SEM_LINK, ...COMERCIO, nome: "Oficina Mecânica Top Car" })
+    const texto = mensagemFixa(comTop)
+    expect(validarMensagem(texto, comTop)).toEqual([])
+    expect(validarMensagem(texto.replace("no Google", "no Google, perfil top"), comTop)).toContain("elogio:top")
+    expect(validarMensagem(texto.replace("no Google", "no Google _ali_"), comTop)).toContain("markdown")
+  })
+
   describe("(a) marcas de IA", () => {
     it.each([
       ["—", "marca_de_ia:travessão"],
