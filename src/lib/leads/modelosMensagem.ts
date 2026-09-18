@@ -89,10 +89,10 @@ export function nomeCurto(nome: string): string {
     .replace(/\s+/g, " ")
     .trim()
 
-  const trecho = (original.split(/\s+[-–—|]\s+|\s*\|\s*/)[0] ?? "").trim()
-  // Lista de serviços depois do nome ("Barber Shop Old Cut: Barbearia, Barbeiro,
-  // Hidratação"). Só corta se o que vem antes da vírgula já identifica o negócio:
-  // em "Garcia, Lima & Becco Advogados" sobraria "Garcia".
+  const trecho = (original.split(/\s+[-–—|]\s+|\s*\|\s*|:\s+/)[0] ?? "").trim()
+  // Lista de serviços depois do nome ("Barbearia, Barbeiro, Hidratação"). Só
+  // corta se o que vem antes da vírgula já identifica o negócio: em
+  // "Garcia, Lima & Becco Advogados" sobraria "Garcia".
   const antesDaVirgula = (trecho.split(",")[0] ?? "").trim()
   let palavras = (quantosTermos(antesDaVirgula) >= 2 ? antesDaVirgula : trecho).split(" ").filter(Boolean)
 
