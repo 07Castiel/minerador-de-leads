@@ -1,5 +1,10 @@
-// Limites e formato da primeira abordagem: horário, números, estrutura da
-// mensagem, termos que bloqueiam o envio e o follow-up.
+// Limites e formato das mensagens: horário, números, estrutura de cada uma,
+// termos que bloqueiam o envio e o follow-up.
+//
+// A conversa tem três mensagens, nesta ordem:
+// 1. a saudação sozinha (MENSAGEM_DE_SAUDACAO), que só abre a conversa;
+// 2. a abertura (MENSAGEM_FIXA), logo em seguida, com o gancho e a pergunta;
+// 3. a apresentação (src/lib/leads/config/apresentacao.ts), só depois da resposta.
 
 export const FUSO_DA_ABORDAGEM = "America/Fortaleza"
 
@@ -7,12 +12,15 @@ export const FUSO_DA_ABORDAGEM = "America/Fortaleza"
 export const GEMINI_NA_ABORDAGEM: boolean = false
 
 // Faixas [de, ate) no horário local. Fora delas o botão não gera mensagem.
-// Sem "?" de propósito: a mensagem só pode ter a pergunta do nicho.
 export const SAUDACOES = [
   { de: "08:00", ate: "12:00", texto: "Bom dia!" },
   { de: "12:00", ate: "18:00", texto: "Boa tarde!" },
   { de: "18:00", ate: "21:00", texto: "Boa noite!" },
 ] as const
+
+// Mensagem 1: vai sozinha, antes da abertura. Curta desse jeito de propósito -
+// é ela que faz a conversa começar como conversa, e não como anúncio.
+export const MENSAGEM_DE_SAUDACAO = "{SAUDACAO} Tudo bem?"
 
 export const LIMITES = {
   caracteres: 400,
@@ -30,14 +38,16 @@ export const LIMITES = {
   diasParaReverificarSite: 3,
 } as const
 
-// Âncora sem pessoa, ou em nicho sem ancoraComPessoa. Verbo de busca ("procurei
-// e achei") em vez de constatação. Sem artigo: "a Igor Gurgel Advogados" e
-// "o Barbearia do Zé" erram o gênero.
-export const ANCORA_PADRAO = "Procurei {NEGOCIO} no Google e achei"
+// Âncora sem pessoa, ou em nicho sem ancoraComPessoa. Verbo de busca, no
+// imperfeito de quem estava procurando, não de quem foi atrás do negócio.
+// Sem artigo: "a Igor Gurgel Advogados" e "o Barbearia do Zé" erram o gênero.
+export const ANCORA_PADRAO = "Tava procurando {NEGOCIO} no Google"
 
-// Duas quebras de linha no máximo, sem linha em branco, sem travessão: é assim
-// que se escreve no WhatsApp.
-export const MENSAGEM_FIXA = "{SAUDACAO} Aqui é o Leonardo, de Sobral.\n{ANCORA}, mas {LACUNA}.\n{PERGUNTA}"
+// Mensagem 2: um parágrafo só, sem quebra de linha e sem dizer quem está
+// falando - isso fica pra apresentação, depois da resposta. "Fiquei curioso" é
+// o que transforma a observação em pergunta de quem quer saber, e não de quem
+// está vendendo.
+export const MENSAGEM_FIXA = "{ANCORA} e vi que {LACUNA}. Fiquei curioso: {PERGUNTA}"
 
 // Marcas de texto de IA. Além destes caracteres, bloqueia linha em branco e mais
 // de LIMITES_DE_LINHA.quebras quebras de linha.
@@ -48,7 +58,23 @@ export const MARCAS_DE_IA: readonly (readonly [trecho: string, nome: string])[] 
   ["...", "reticências"],
 ]
 
-export const LIMITES_DE_LINHA = { quebras: 2 } as const
+// A abertura é um parágrafo só: nenhuma quebra de linha.
+export const LIMITES_DE_LINHA = { quebras: 0 } as const
+
+// Passo 2 (src/lib/leads/config/apresentacao.ts): três parágrafos separados por
+// linha em branco, que é como se manda um texto longo no WhatsApp sem virar
+// parede. São 4 quebras de linha, e a linha em branco, que na abertura é marca
+// de IA, aqui é o formato.
+export const LIMITES_DA_APRESENTACAO = { caracteres: 900, quebras: 4, linhaEmBranco: true } as const
+
+// Grupos de TERMOS_BLOQUEADOS que valem só na abertura. Depois da resposta,
+// dizer o que se faz é o assunto da mensagem, então "oferta" sai - e com ela o
+// preço e o link, que são a mesma coisa. "permissao" sai junto porque a
+// apresentação fecha convidando ("Posso te mandar um exemplo?"): numa conversa
+// que a pessoa já respondeu duas vezes, isso é fechamento, não pedido de
+// licença pra falar. Promessa de resultado e elogio continuam fora nas duas, e
+// a trava do nicho também.
+export const GRUPOS_SO_DA_ABERTURA: readonly string[] = ["oferta", "permissao"]
 
 // Bloqueiam a mensagem, em qualquer nicho. Comparação sem acento e sem diferença
 // de maiúsculas, a partir do início de uma palavra ("orçamentos" também bloqueia).

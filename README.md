@@ -32,9 +32,11 @@ Variáveis em `.env.local` (modelo em `.env.example`).
   envie ao CRM, exporte CSV ou analise os sites dos resultados visíveis.
 - **Lead** (`/leads/:id`): dados, ligar/WhatsApp, etapa, motivo de perda,
   próximo contato, observações e análise do site.
-- **WhatsApp** (no card do CRM, na lista Hoje e no lead): mostra a mensagem que o
-  sistema decidiu pro lead, em texto fixo, versão curta ou redigida pelo Gemini,
-  e o retorno para quem já foi abordado. Dá pra editar, mas o texto editado passa
+- **WhatsApp** (no card do CRM, na lista Hoje e no lead): mostra as duas
+  mensagens da abertura (a saudação sozinha e o texto com o gancho), em texto
+  fixo, versão curta ou redigidas pelo Gemini, e, para quem já foi abordado, a
+  apresentação (a mensagem 3, depois que o lead responde) e o retorno. O botão
+  abre o WhatsApp com a mensagem 1 e copia a 2 pra área de transferência. Dá pra editar, mas o texto editado passa
   pela mesma validação. Fora do horário (antes das 08:00 ou a partir das 21:00,
   horário de Fortaleza) e lead sem lacuna não geram mensagem. Depois de abrir, um
   aviso oferece marcar o lead como abordado e o retorno em 3 dias.
@@ -86,6 +88,12 @@ As migrations em `supabase/migrations/` já estão aplicadas:
   três modelos iniciais para toda conta (inclusive as novas, por gatilho).
 - `20260918120000_modelos_padrao_saem_do_banco.sql`: tira os três modelos
   iniciais e o gatilho; esses textos passam a ser gerados em código.
+- `20260918140000_codigo_da_falha_do_site.sql`: coluna `site_falha` com o porquê
+  de o site não abrir (`ENOTFOUND`, `TIMEOUT`...), que o status sozinho juntava.
+- `20260918160000_abordagens.sql`: tabela `abordagens`, uma linha por mensagem
+  gerada para uso, com RLS; é dela que sai a anti-repetição de lacuna.
+- `20260918170000_abordagem_de_apresentacao.sql`: `tipo = 'apresentacao'` na
+  tabela `abordagens`, para o passo 2 não se misturar com a abertura.
 
 **Score (0 a 100), calculado por gatilho a cada gravação em `leads`:**
 
@@ -163,14 +171,18 @@ Tipos: `npx supabase gen types typescript --project-id iypipenavdztjqkcgwgc > sr
 gatilho cria a organização automaticamente, com o nome vindo do e-mail. Para
 renomear: `update public.organizacoes set nome = 'Núcleo Tech';`
 
-**Mensagem de WhatsApp.** `POST /api/leads/:id/mensagem-whatsapp` com
-`{ modo: "completa" | "curta" | "gemini" }`, em três camadas
-(`src/lib/leads/abordagem.ts`, textos e limites em `src/lib/leads/config/`):
+**Mensagem de WhatsApp.** A conversa tem três mensagens: a saudação sozinha
+("Bom dia! Tudo bem?"), a abertura logo em seguida, e a apresentação, só depois
+que o lead responde. As duas primeiras saem de `POST
+/api/leads/:id/mensagem-whatsapp` com `{ modo: "completa" | "curta" | "gemini" }`,
+em três camadas (`src/lib/leads/abordagem.ts`, textos e limites em
+`src/lib/leads/config/`):
 1. O código decide tudo: horário (America/Fortaleza), nicho (categoria do
    Google; termo da busca só se a categoria for genérica), lacuna (sem site ou
    link fora do site; poucas fotos e pouca avaliação só em comércio), âncora
    com a pessoa do nome quando dá pra afirmar, e a pergunta final.
-2. O texto sai fixo, na estrutura de 3 linhas, ou o Gemini redige
+2. O texto sai fixo, num parágrafo só ("{ÂNCORA} e vi que {LACUNA}. Fiquei
+   curioso: {PERGUNTA}", sem dizer quem está falando), ou o Gemini redige
    (`src/lib/gemini.ts`, prompt em `src/lib/leads/mensagemWhatsApp.ts`). O
    Gemini só recebe saudação, âncora, lacuna, pergunta e tratamento, nunca os
    dados do lead. Primeira tentativa no `gemini-3.5-flash`, retry no
@@ -179,6 +191,20 @@ renomear: `update public.organizacoes set nome = 'Núcleo Tech';`
    promessa, elogio, termos vedados na advocacia, mais de uma pergunta, texto
    sem o nome ou sem a pergunta decidida. Gemini bloqueado duas vezes vira o
    texto fixo, e o motivo vai pro log do servidor.
+
+**Apresentação (mensagem 3).** A abertura não pode dizer o que se vende: é isso
+que faz um número virar spam. Quem faz esse trabalho é a apresentação, que só
+existe depois que o lead responde, sai da janela do WhatsApp e é gravada em
+`abordagens` com `tipo = 'apresentacao'`. São três parágrafos separados por linha
+em branco (`src/lib/leads/config/apresentacao.ts`): quem está falando e o que a
+empresa faz, como funcionaria no ramo daquele lead, e o convite. Só o do meio
+muda por nicho, e o "Pra {RAMO} funcionaria assim" usa a categoria do Google do
+lead ("Pra pizzaria"), com o ramo do nicho como reserva. `validarApresentacao`
+usa a mesma régua de escrita da abertura, com 900 caracteres, 4 quebras de linha
+e linha em branco permitida, e libera os grupos `oferta` e `permissao` - promessa
+de resultado, elogio e a trava da advocacia continuam valendo. A da advocacia
+fala de área de atuação e formação, e nunca de agenda, preço ou avaliação, que é
+onde o código de ética restringe.
 
 Os testes usam as mensagens reais do fluxo antigo e os 100 leads reais
 (`src/lib/leads/fixtures/leads-reais.json`). Precisa de `GEMINI_API_KEY`.

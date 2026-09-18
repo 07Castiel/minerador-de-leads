@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState } from "react"
 import { useMutation } from "@tanstack/react-query"
-import { Loader2Icon, MessageCircleIcon, RefreshCwIcon } from "lucide-react"
+import { CopyIcon, Loader2Icon, MessageCircleIcon, RefreshCwIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -26,8 +26,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { useAgendarRetorno } from "@/hooks/useLeads"
 import { linkWhatsApp } from "@/lib/contato"
 import {
+  apresentacaoDoNicho,
   descreverMotivo,
   mensagemDeRetorno,
+  resolverNicho,
+  validarApresentacao,
   validarConteudo,
   validarMensagem,
   type MensagemDaJanela,
@@ -45,12 +48,13 @@ type BotaoWhatsAppProps = {
   size: "xs" | "sm"
 }
 
-type Opcao = ModoDaJanela | "retorno"
+type Opcao = ModoDaJanela | "apresentacao" | "retorno"
 
 const ROTULOS: Record<Opcao, string> = {
   completa: "Texto fixo",
   curta: "Texto fixo curto",
   gemini: "Escrito pelo Gemini",
+  apresentacao: "Apresentação (depois que ele responder)",
   retorno: "Retorno (confirmar se chegou)",
 }
 
@@ -63,6 +67,7 @@ const JANELA_DE_HORARIO = `${SAUDACOES[0].de} e ${SAUDACOES[SAUDACOES.length - 1
 // lacuna, não há mensagem.
 export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
   const idDoSeletor = useId()
+  const idDoTexto = useId()
   const [aberto, setAberto] = useState(false)
   // Primeira resposta da abertura: diz se tem mensagem e com que regras validar
   const [base, setBase] = useState<MensagemDaJanela | null>(null)
@@ -103,13 +108,19 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
     )
   }
 
+  // Nicho do passo 2: a base traz o nicho já resolvido com o termo da busca;
+  // sem ela (lead sem lacuna), a categoria do Google resolve sozinha.
+  function nichoDoLead(): string {
+    return base?.tipo === "pronta" ? base.validacao.nicho : resolverNicho(lead.categoria).id
+  }
+
   function escolher(valor: Opcao) {
     setOpcao(valor)
     opcaoAtual.current = valor
     setMensagem("")
     setOrigem(null)
-    if (valor === "retorno") {
-      setMensagem(mensagemDeRetorno())
+    if (valor === "retorno" || valor === "apresentacao") {
+      setMensagem(valor === "retorno" ? mensagemDeRetorno() : apresentacaoDoNicho(nichoDoLead()))
       setOrigem("fixa")
       return
     }
@@ -125,6 +136,19 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
     escolher("completa")
   }
 
+  // A mensagem 2 no clique do botão: o link do WhatsApp já leva a 1, e colar é
+  // o caminho mais curto pra segunda. Se o navegador negar a área de
+  // transferência, o botão "Copiar" ao lado do texto continua lá.
+  async function copiarSegunda(): Promise<void> {
+    if (!abertura || !mensagem.trim()) return
+    try {
+      await navigator.clipboard.writeText(mensagem.trim())
+      toast.success("Mensagem 2 copiada: mande a saudação e cole em seguida.")
+    } catch {
+      toast.info('Copie a mensagem 2 no botão "Copiar" antes de mandar a saudação.')
+    }
+  }
+
   // Registra a mensagem quando ela é de fato usada: o clique em "Abrir no
   // WhatsApp". Abrir a janela e não mandar nada não conta.
   async function registrar() {
@@ -133,9 +157,10 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
       await registrarAbordagens(supabaseBrowser(), [
         {
           lead_id: lead.id,
-          tipo: opcao === "retorno" ? "follow_up" : "primeira",
-          lacuna: opcao === "retorno" ? null : (pronta?.lacuna ?? null),
-          nicho: pronta?.validacao.nicho ?? "outros",
+          tipo: opcao === "retorno" ? "follow_up" : opcao === "apresentacao" ? "apresentacao" : "primeira",
+          // Só a abertura tem lacuna: é dela que sai a anti-repetição
+          lacuna: opcao === "retorno" || opcao === "apresentacao" ? null : (pronta?.lacuna ?? null),
+          nicho: nichoDoLead(),
           texto: mensagem.trim(),
           origem: opcao === "gemini" && origem === "gemini" ? "gemini" : "fixo",
           aberto_whatsapp: true,
@@ -176,25 +201,33 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
 
   const carregando = carregar.isPending
   const pronta = base?.tipo === "pronta" ? base : null
+  // Abertura: a saudação vai sozinha antes, então são duas mensagens. A
+  // apresentação e o retorno entram numa conversa já aberta, e vão sozinhas.
+  const abertura = opcao !== "" && opcao !== "apresentacao" && opcao !== "retorno" ? pronta : null
   const foraDoHorario = base?.tipo === "fora_do_horario"
   const descartado = base?.tipo === "descartado_sem_gancho"
   const opcoes: Opcao[] = [
     ...(pronta ? (["completa", "curta"] as const) : []),
     ...(pronta && GEMINI_NA_ABORDAGEM ? (["gemini"] as const) : []),
-    ...(base && !foraDoHorario && lead.etapa !== "novo" ? (["retorno"] as const) : []),
+    ...(base && !foraDoHorario && lead.etapa !== "novo" ? (["apresentacao", "retorno"] as const) : []),
   ]
 
   const motivos =
     !mensagem.trim() || carregando || opcao === ""
       ? []
-      : opcao === "retorno"
-        ? validarConteudo(mensagem, pronta?.validacao.nicho ?? null)
-        : pronta
-          ? validarMensagem(mensagem, pronta.validacao)
-          : []
+      : opcao === "apresentacao"
+        ? validarApresentacao(mensagem, nichoDoLead())
+        : opcao === "retorno"
+          ? validarConteudo(mensagem, nichoDoLead())
+          : pronta
+            ? validarMensagem(mensagem, pronta.validacao)
+            : []
   const podeAbrir = opcao !== "" && !carregando && mensagem.trim() !== "" && motivos.length === 0
 
-  const linkComTexto = linkWhatsApp(lead.telefone, mensagem.trim() || undefined)
+  // Com duas mensagens, o WhatsApp abre com a 1 (o link só preenche uma vez) e
+  // a 2 vai pra área de transferência no mesmo clique.
+  const textoDoLink = abertura ? abertura.saudacao : mensagem.trim()
+  const linkComTexto = linkWhatsApp(lead.telefone, textoDoLink || undefined)
   const linkSemTexto = linkWhatsApp(lead.telefone)
   if (!linkSemTexto) return null
 
@@ -204,15 +237,17 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
       ? "Nada a apontar neste lead."
       : base?.tipo === "manual" && opcao === ""
         ? "Sem mensagem automática para este lead."
-        : opcao === "retorno"
-          ? "Confirma se a primeira mensagem chegou."
-          : opcao === "gemini" && origem === "gemini"
-            ? "Redigida pelo Gemini com o mesmo gancho do texto fixo. Revise antes de enviar."
-            : opcao === "gemini" && origem === "fixa"
-              ? "O Gemini não passou na revisão, então veio o texto fixo. Revise antes de enviar."
-              : base
-                ? "Texto fixo, decidido pelo sistema para este lead. Revise antes de enviar."
-                : "Montando a mensagem..."
+        : opcao === "apresentacao"
+          ? "Só depois que ele responder: aqui é onde o serviço e a empresa aparecem."
+          : opcao === "retorno"
+            ? "Confirma se a primeira mensagem chegou."
+            : opcao === "gemini" && origem === "gemini"
+              ? "Redigida pelo Gemini com o mesmo gancho do texto fixo. Revise antes de enviar."
+              : opcao === "gemini" && origem === "fixa"
+                ? "O Gemini não passou na revisão, então veio o texto fixo. Revise antes de enviar."
+                : base
+                  ? "Texto fixo, decidido pelo sistema para este lead. Revise antes de enviar."
+                  : "Montando a mensagem..."
 
   return (
     <>
@@ -272,6 +307,29 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
             </div>
           )}
 
+          {abertura && !carregando && (
+            <div className="flex flex-col gap-1">
+              <Label>Mensagem 1 (vai sozinha, primeiro)</Label>
+              <p className="rounded-md border bg-muted/50 p-3 text-sm">{abertura.saudacao}</p>
+            </div>
+          )}
+
+          {abertura && !carregando && mensagem !== "" && (
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor={idDoTexto}>Mensagem 2 (logo em seguida)</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => void copiarSegunda()}
+                disabled={mensagem.trim() === ""}
+              >
+                <CopyIcon />
+                Copiar
+              </Button>
+            </div>
+          )}
+
           {carregando && !mensagem ? (
             <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2Icon className="size-4 animate-spin" />
@@ -281,7 +339,8 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
             opcao !== "" &&
             mensagem !== "" && (
               <Textarea
-                aria-label="Texto da mensagem"
+                id={idDoTexto}
+                aria-label={abertura ? "Texto da mensagem 2" : "Texto da mensagem"}
                 value={mensagem}
                 onChange={(e) => setMensagem(e.target.value)}
                 disabled={carregando}
@@ -323,12 +382,13 @@ export function BotaoWhatsApp({ lead, size }: BotaoWhatsAppProps) {
                     rel="noreferrer"
                     onClick={() => {
                       setAberto(false)
+                      void copiarSegunda()
                       void registrar()
                       sugerirRetorno()
                     }}
                   >
                     <MessageCircleIcon />
-                    Abrir no WhatsApp
+                    {abertura ? "Abrir com a mensagem 1" : "Abrir no WhatsApp"}
                   </a>
                 </Button>
               ) : (

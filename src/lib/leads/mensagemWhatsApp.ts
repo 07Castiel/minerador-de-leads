@@ -9,17 +9,17 @@ import type { DadosDaAbordagem, TentativaBloqueada } from "@/lib/leads/abordagem
 import { LIMITES, MENSAGEM_FIXA } from "@/lib/leads/abordagemConfig"
 
 // A estrutura vem do mesmo config do texto fixo.
-export const INSTRUCOES_DO_REDATOR = `Você redige uma única mensagem de WhatsApp de primeiro contato, em português brasileiro natural do Ceará. Você NÃO decide o conteúdo: recebe todos os elementos já resolvidos e apenas os encaixa com fluência.
+export const INSTRUCOES_DO_REDATOR = `Você redige a segunda mensagem de um primeiro contato por WhatsApp, em português brasileiro natural do Ceará. A saudação já foi mandada antes, sozinha, e quem está falando só se apresenta depois que a pessoa responder: nada disso entra aqui. Você NÃO decide o conteúdo: recebe todos os elementos já resolvidos e apenas os encaixa com fluência.
 
-Os elementos chegam entre tags com o mesmo nome: <SAUDACAO>, <ANCORA>, <LACUNA> e <PERGUNTA>.
+Os elementos chegam entre tags com o mesmo nome: <ANCORA>, <LACUNA> e <PERGUNTA>.
 
-Estrutura obrigatória, no máximo 3 linhas, sem linha em branco:
+Estrutura obrigatória, um parágrafo só, sem nenhuma quebra de linha:
 ${MENSAGEM_FIXA}
 
 Regras:
 - Não escolha outro gancho. Se notar outra coisa no perfil, ignore.
 - Não elogie o negócio, o atendimento nem as avaliações.
-- Não diga o que o remetente vende, não ofereça nada, não peça permissão para mandar nada, não prometa resultado.
+- Não diga quem é o remetente nem o que ele vende, não ofereça nada, não peça permissão para mandar nada, não prometa resultado.
 - A {PERGUNTA} vem pronta, com a concordância já resolvida: copie literalmente, sem trocar você por vocês nem nenhuma outra palavra.
 - A mensagem termina na {PERGUNTA}. Nada depois.
 - Uma única interrogação em toda a mensagem.
@@ -38,14 +38,14 @@ type ContextoDoPedido = {
 }
 
 export function montarPedidoDoRedator(
-  dados: Pick<DadosDaAbordagem, "saudacao" | "ancora" | "textoDaLacuna" | "pergunta">,
+  dados: Pick<DadosDaAbordagem, "ancora" | "textoDaLacuna" | "pergunta">,
   { descartadas = [], bloqueiosAnteriores = [] }: ContextoDoPedido = {}
 ): string {
   // Sem tratamento (você/vocês): a camada 1 já resolve dentro da lacuna e da
-  // pergunta, e mandar isso fazia o Gemini "corrigir" a pergunta fixa.
+  // pergunta, e mandar isso fazia o Gemini "corrigir" a pergunta fixa. Sem
+  // saudação: ela é a mensagem 1, e não passa por aqui.
   const partes = [
     [
-      `<SAUDACAO>${dados.saudacao}</SAUDACAO>`,
       `<ANCORA>${dados.ancora}</ANCORA>`,
       `<LACUNA>${dados.textoDaLacuna}</LACUNA>`,
       `<PERGUNTA>${dados.pergunta}</PERGUNTA>`,

@@ -60,13 +60,12 @@ describe("Gemini na abordagem", () => {
 })
 
 describe("montarPedidoDoRedator", () => {
-  it("leva só os elementos decididos pela camada 1, sem tratamento", () => {
+  it("leva só os elementos decididos pela camada 1, sem saudação e sem tratamento", () => {
     expect(montarPedidoDoRedator(dados())).toBe(
       [
-        "<SAUDACAO>Bom dia!</SAUDACAO>",
-        "<ANCORA>Procurei o escritório de Luiz Carlos no Google e achei</ANCORA>",
+        "<ANCORA>Tava procurando o escritório de Luiz Carlos no Google</ANCORA>",
         "<LACUNA>não tem site, só o telefone</LACUNA>",
-        "<PERGUNTA>Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?</PERGUNTA>",
+        "<PERGUNTA>quem te procura chega direto aqui pelo WhatsApp?</PERGUNTA>",
       ].join("\n") + "\n\nEscreva a mensagem."
     )
   })

@@ -1,6 +1,6 @@
 // Lista de leads em texto, para mandar as mensagens fora do app:
 //
-// Saudação: "Bom dia!" (para enviar entre 08:00 e 12:00)
+// Mensagem 1, antes de cada uma (para enviar entre 08:00 e 12:00): "Bom dia! Tudo bem?" — 20 leads
 //
 // LUIZ CARLOS SILVA ADVOCACIA
 // Nicho: Advocacia
@@ -16,6 +16,7 @@ import { telefoneInternacional } from "@/lib/contato"
 import {
   descreverMotivo,
   mensagemDeRetorno,
+  mensagemDeSaudacao,
   mensagemFixa,
   prepararAbordagem,
   resolverNicho,
@@ -62,12 +63,15 @@ export function blocoDoLead(lead: LeadDaLista, mensagem: string, motivo: string 
     `Nicho: ${nichoDaLista(lead.categoria)}`,
     `Cidade: ${lead.cidade?.trim() || "Não informada"}`,
     telefoneDaLista(lead.telefone),
-    `Mensagem: "${mensagem.trim()}"${mensagem.trim() === "" && motivo ? ` (${motivo})` : ""}`,
+    `Mensagem 2: "${mensagem.trim()}"${mensagem.trim() === "" && motivo ? ` (${motivo})` : ""}`,
   ].join("\n")
 }
 
+// A saudação é a mensagem 1, igual pra todo mundo, então vem uma vez no topo
+// em vez de repetir em cada bloco; a do bloco é a mensagem 2.
 export function cabecalhoDaLista(faixa: FaixaDeSaudacao, quantos: number): string {
-  return `Saudação: "${faixa.texto}" (para enviar entre ${faixa.de} e ${faixa.ate}) — ${quantos} leads`
+  const saudacao = mensagemDeSaudacao({ saudacao: faixa.texto })
+  return `Mensagem 1, antes de cada uma (para enviar entre ${faixa.de} e ${faixa.ate}): "${saudacao}" — ${quantos} leads`
 }
 
 export type ItemDaLista = {

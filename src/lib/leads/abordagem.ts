@@ -5,17 +5,25 @@
 // Textos e limites: src/lib/leads/config/.
 
 import {
+  ABERTURA_DA_APRESENTACAO,
   ANCORA_PADRAO,
+  APRESENTACAO_PADRAO,
+  APRESENTACAO_POR_NICHO,
   CATEGORIAS_GENERICAS,
+  FECHAMENTO_DA_APRESENTACAO,
   FOLLOW_UP,
+  GRUPOS_SO_DA_ABERTURA,
   FUSO_DA_ABORDAGEM,
   LACUNAS_DA_ABORDAGEM,
   LACUNAS_SO_DE_COMERCIO,
   LIMITES,
+  LIMITES_DA_APRESENTACAO,
   LIMITES_DE_LINHA,
   MARCAS_DE_IA,
+  MENSAGEM_DE_SAUDACAO,
   MENSAGEM_FIXA,
   NICHOS,
+  PARAGRAFO_DO_NICHO,
   NICHO_PADRAO,
   NOMES_DE_DESTINO,
   SAUDACOES,
@@ -250,11 +258,16 @@ export function prepararAbordagem(
   }
 }
 
-// Mensagem sem LLM: a estrutura do config com os dados já resolvidos. "curta"
-// (antigo modelo "Abordagem curta") só troca a observação pela versão enxuta.
+// Mensagem 1: vai sozinha, antes da abertura.
+export function mensagemDeSaudacao(dados: Pick<DadosDaAbordagem, "saudacao">): string {
+  return preencher(MENSAGEM_DE_SAUDACAO, { SAUDACAO: dados.saudacao })
+}
+
+// Mensagem 2, sem LLM: a estrutura do config com os dados já resolvidos. Não
+// leva a saudação, que já foi na mensagem 1. "curta" (antigo modelo "Abordagem
+// curta") só troca a observação pela versão enxuta.
 export function mensagemFixa(dados: DadosDaAbordagem, formato: "completa" | "curta" = "completa"): string {
   return preencher(MENSAGEM_FIXA, {
-    SAUDACAO: dados.saudacao,
     ANCORA: dados.ancora,
     LACUNA: formato === "curta" ? dados.textoCurtoDaLacuna : dados.textoDaLacuna,
     PERGUNTA: dados.pergunta,
@@ -298,15 +311,40 @@ function semONomeDoLead(texto: string, nome: string | null): string {
   return texto.replace(new RegExp(escapado, "gi"), " ")
 }
 
+// O que muda entre a abertura e o passo 2: o tamanho, quantas quebras de linha
+// cabem e quais grupos de termo bloqueiam. O resto das regras é igual nas duas.
+type PerfilDaValidacao = {
+  caracteres: number
+  quebras: number
+  // Linha em branco é marca de IA na abertura e formato na apresentação
+  linhaEmBranco: boolean
+  gruposLiberados: readonly string[]
+}
+
+const PERFIL_DA_ABERTURA: PerfilDaValidacao = {
+  caracteres: LIMITES.caracteres,
+  quebras: LIMITES_DE_LINHA.quebras,
+  linhaEmBranco: false,
+  gruposLiberados: [],
+}
+
+const PERFIL_DA_APRESENTACAO: PerfilDaValidacao = {
+  caracteres: LIMITES_DA_APRESENTACAO.caracteres,
+  quebras: LIMITES_DA_APRESENTACAO.quebras,
+  linhaEmBranco: LIMITES_DA_APRESENTACAO.linhaEmBranco,
+  gruposLiberados: GRUPOS_SO_DA_ABERTURA,
+}
+
 // Regras que valem pra qualquer texto que vai pro WhatsApp, inclusive o retorno
 // (que não tem nome nem pergunta). Lista vazia = pode enviar; cada item vira o
 // motivo registrado do bloqueio. nomeDoLead sai das regras de escrita (markdown
 // e termos bloqueados); tamanho, emoji e marcas de IA continuam no texto inteiro,
 // porque valem para a mensagem como ela vai ser enviada.
-export function validarConteudo(
+function validarComPerfil(
   texto: string,
-  nicho: string | null = null,
-  nomeDoLead: string | null = null
+  nicho: string | null,
+  nomeDoLead: string | null,
+  perfil: PerfilDaValidacao
 ): string[] {
   if (!texto.trim()) return ["vazia"]
   const motivos: string[] = []
@@ -319,11 +357,11 @@ export function validarConteudo(
     if (texto.includes(trecho)) adicionar(`marca_de_ia:${nome}`)
   }
   const quebras = (texto.trim().match(/\n/g) ?? []).length
-  if (quebras > LIMITES_DE_LINHA.quebras) adicionar(`marca_de_ia:mais_de_${LIMITES_DE_LINHA.quebras}_quebras`)
-  if (/\n[^\S\n]*\n/.test(texto.trim())) adicionar("marca_de_ia:linha_em_branco")
+  if (quebras > perfil.quebras) adicionar(`marca_de_ia:mais_de_${perfil.quebras}_quebras`)
+  if (!perfil.linhaEmBranco && /\n[^\S\n]*\n/.test(texto.trim())) adicionar("marca_de_ia:linha_em_branco")
 
   if ((texto.match(/\?/g) ?? []).length > 1) adicionar("mais_de_uma_pergunta")
-  if (texto.length > LIMITES.caracteres) adicionar(`passa_de_${LIMITES.caracteres}_caracteres`)
+  if (texto.length > perfil.caracteres) adicionar(`passa_de_${perfil.caracteres}_caracteres`)
   if (/\p{Extended_Pictographic}/u.test(texto)) adicionar("emoji")
 
   const escrito = semONomeDoLead(texto, nomeDoLead)
@@ -331,7 +369,9 @@ export function validarConteudo(
 
   // (b) oferta, (c) permissão, (d) promessa, (f) elogio; (e) termos do nicho
   const normalizado = normalizar(escrito)
-  const grupos: [string, readonly string[]][] = Object.entries(TERMOS_BLOQUEADOS)
+  const grupos: [string, readonly string[]][] = Object.entries(TERMOS_BLOQUEADOS).filter(
+    ([grupo]) => !perfil.gruposLiberados.includes(grupo)
+  )
   const doNicho = nicho ? TERMOS_BLOQUEADOS_POR_NICHO[nicho] : undefined
   if (nicho && doNicho) grupos.push([nicho, doNicho])
   for (const [grupo, termos] of grupos) {
@@ -340,6 +380,41 @@ export function validarConteudo(
     }
   }
   return motivos
+}
+
+export function validarConteudo(
+  texto: string,
+  nicho: string | null = null,
+  nomeDoLead: string | null = null
+): string[] {
+  return validarComPerfil(texto, nicho, nomeDoLead, PERFIL_DA_ABERTURA)
+}
+
+// Passo 2: a mesma régua de escrita, mais folgada no tamanho, e sem a trava de
+// oferta, porque dizer o que se faz é o assunto desta mensagem. Promessa,
+// pedido de permissão, elogio e a trava do nicho continuam valendo.
+export function validarApresentacao(texto: string, nicho: string | null = null): string[] {
+  return validarComPerfil(texto, nicho, null, PERFIL_DA_APRESENTACAO)
+}
+
+// "Pra pizzaria funcionaria assim": a categoria do Google é mais específica que
+// o nicho, então ela vem na frente. Categoria vazia ou que não diz o ramo
+// (CATEGORIAS_GENERICAS) cai no ramo do nicho.
+export function ramoDaApresentacao(nicho: string, categoria: string | null = null): string {
+  const doNicho = (APRESENTACAO_POR_NICHO[nicho] ?? APRESENTACAO_PADRAO).ramo
+  if (!categoria?.trim() || CATEGORIAS_GENERICAS.includes(normalizar(categoria))) return doNicho
+  return categoria.trim().toLocaleLowerCase("pt-BR")
+}
+
+// Mensagem 3: três parágrafos separados por linha em branco. Só o do meio muda
+// por nicho; nicho sem texto próprio leva o padrão.
+export function apresentacaoDoNicho(nicho: string, categoria: string | null = null): string {
+  const doNicho = APRESENTACAO_POR_NICHO[nicho] ?? APRESENTACAO_PADRAO
+  const meio = preencher(PARAGRAFO_DO_NICHO, {
+    RAMO: ramoDaApresentacao(nicho, categoria),
+    COMO_FUNCIONA: doNicho.comoFunciona,
+  })
+  return [ABERTURA_DA_APRESENTACAO, meio, FECHAMENTO_DA_APRESENTACAO].join("\n\n")
 }
 
 // Camada 3 da abordagem: as regras de conteúdo, mais citar o nome e terminar na pergunta decidida.
@@ -406,6 +481,9 @@ export type MensagemDaJanela =
   | {
       tipo: "pronta"
       lacuna: LacunaDaAbordagem
+      // Mensagem 1, que vai sozinha antes do texto
+      saudacao: string
+      // Mensagem 2
       texto: string
       origem: "gemini" | "fixa"
       bloqueios: TentativaBloqueada[]
@@ -448,6 +526,7 @@ export async function mensagemParaJanela(
   const { dados } = preparo
   const comum = {
     lacuna: dados.lacuna,
+    saudacao: mensagemDeSaudacao(dados),
     validacao: { referencia: dados.referencia, pergunta: dados.pergunta, nicho: dados.nicho },
   }
 

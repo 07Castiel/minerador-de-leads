@@ -35,17 +35,17 @@ export const TEXTOS_DAS_LACUNAS = {
   link_fora_do_site: {
     whatsapp: "o link abre o WhatsApp direto, sem site",
     // "site não" sobrava: se o link vai pra rede social, já está dito
-    redeSocial: "o link só vai pro {DESTINO}",
-    redeSocialSemNome: "o link só vai pra uma rede social",
+    redeSocial: "o link de vocês leva só pro {DESTINO}",
+    redeSocialSemNome: "o link de vocês leva só pra uma rede social",
     // página de links (Linktree...) ou diretório (Jusbrasil, iFood...)
-    pagina: "o link só vai pra uma página no {DESTINO}",
+    pagina: "o link de vocês leva pra uma página no {DESTINO}",
     paginaDeLinksSemNome: "o link só vai pra uma página de links",
     plataformaSemNome: "o link só vai pra uma página de outro site",
     // Pergunta própria (opcional, por nicho) quando o link vai pra uma página: a
     // do nicho perguntaria por uma página que a observação acabou de citar.
     // Sem entrada, vale a pergunta do nicho.
     perguntaQuandoPagina: {
-      advocacia: "Quem te procura por lá chega a ver suas áreas de atuação ou te chama direto?",
+      advocacia: "quem te procura por lá chega a ver suas áreas de atuação?",
     } as Partial<Record<string, string>>,
   },
   // Site próprio com problema. A âncora já diz "Procurei ... e achei", então o

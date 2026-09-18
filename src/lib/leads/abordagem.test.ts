@@ -1,16 +1,20 @@
 import { describe, expect, it, vi } from "vitest"
 
 import {
+  apresentacaoDoNicho,
   descreverMotivo,
   escolherLacuna,
   mensagemDeRetorno,
+  mensagemDeSaudacao,
   mensagemFixa,
   mensagemParaJanela,
   precisaReverificarSite,
   prepararAbordagem,
+  ramoDaApresentacao,
   redigirAbordagem,
   resolverNicho,
   saudacaoDoHorario,
+  validarApresentacao,
   validarConteudo,
   validarMensagem,
   type CamposDaAbordagem,
@@ -18,8 +22,13 @@ import {
   type OpcoesDaAbordagem,
 } from "@/lib/leads/abordagem"
 import {
+  ABERTURA_DA_APRESENTACAO,
+  APRESENTACAO_PADRAO,
+  APRESENTACAO_POR_NICHO,
+  FECHAMENTO_DA_APRESENTACAO,
   NICHOS,
   NICHO_PADRAO,
+  REMETENTE,
   TERMOS_BLOQUEADOS,
   TERMOS_BLOQUEADOS_POR_NICHO,
   TERMOS_DE_PALAVRA_INTEIRA,
@@ -93,11 +102,14 @@ describe("padrão-ouro", () => {
     cidade: "Sobral",
   }
 
-  it("mensagemFixa sai exatamente assim", () => {
+  it("a saudação vai sozinha, na mensagem 1", () => {
+    expect(mensagemDeSaudacao(dados(lead))).toBe("Bom dia! Tudo bem?")
+  })
+
+  it("mensagemFixa sai num parágrafo só, sem dizer quem está falando", () => {
     expect(mensagemFixa(dados(lead))).toBe(
-      "Bom dia! Aqui é o Leonardo, de Sobral.\n" +
-        "Procurei o escritório de Luiz Carlos no Google e achei, mas não tem site, só o telefone.\n" +
-        "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?"
+      "Tava procurando o escritório de Luiz Carlos no Google e vi que não tem site, só o telefone. " +
+        "Fiquei curioso: quem te procura chega direto aqui pelo WhatsApp?"
     )
   })
 
@@ -187,12 +199,12 @@ describe("resolverNicho", () => {
 
   it("perguntas curtas, uma por nicho", () => {
     expect(resolverNicho("Advogado").pergunta).toBe(
-      "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?"
+      "quem te procura chega direto aqui pelo WhatsApp?"
     )
-    expect(resolverNicho("Confeitaria").pergunta).toBe("Como vocês tocam as encomendas hoje, tudo por aqui?")
-    expect(resolverNicho("Barbearia").pergunta).toBe("Os agendamentos ficam tudo no WhatsApp?")
-    expect(resolverNicho("Loja de roupas").pergunta).toBe("Quando perguntam preço você manda foto na hora?")
-    expect(resolverNicho(null).pergunta).toBe("É assim mesmo hoje?")
+    expect(resolverNicho("Confeitaria").pergunta).toBe("as encomendas que não são feitas no balcão chegam todas aqui pelo WhatsApp?")
+    expect(resolverNicho("Barbearia").pergunta).toBe("os horários que vocês marcam chegam todos aqui pelo WhatsApp?")
+    expect(resolverNicho("Loja de roupas").pergunta).toBe("quando perguntam preço, vocês mandam foto uma por uma aqui?")
+    expect(resolverNicho(null).pergunta).toBe("é tudo por aqui mesmo?")
   })
 })
 
@@ -224,16 +236,16 @@ describe("lacunas", () => {
   })
 
   it.each([
-    ["https://www.instagram.com/silva.adv/", "o link só vai pro Instagram"],
-    ["https://facebook.com/silva.adv", "o link só vai pro Facebook"],
-    ["https://twitter.com/silva", "o link só vai pra uma rede social"],
+    ["https://www.instagram.com/silva.adv/", "o link de vocês leva só pro Instagram"],
+    ["https://facebook.com/silva.adv", "o link de vocês leva só pro Facebook"],
+    ["https://twitter.com/silva", "o link de vocês leva só pra uma rede social"],
     ["https://wa.link/abc123", "o link abre o WhatsApp direto, sem site"],
-    ["https://linktr.ee/silva", "o link só vai pra uma página no Linktree"],
-    ["https://eduardo.linkbio.co", "o link só vai pra uma página no Linkbio"],
+    ["https://linktr.ee/silva", "o link de vocês leva pra uma página no Linktree"],
+    ["https://eduardo.linkbio.co", "o link de vocês leva pra uma página no Linkbio"],
     ["https://bio.link/silva", "o link só vai pra uma página de links"],
-    ["https://silva.jusfy.com.br", "o link só vai pra uma página no Jusfy"],
-    ["https://silva.jusbrasil.com.br", "o link só vai pra uma página no Jusbrasil"],
-    ["https://chat-e923e9.zapier.app", "o link só vai pra uma página no Zapier"],
+    ["https://silva.jusfy.com.br", "o link de vocês leva pra uma página no Jusfy"],
+    ["https://silva.jusbrasil.com.br", "o link de vocês leva pra uma página no Jusbrasil"],
+    ["https://chat-e923e9.zapier.app", "o link de vocês leva pra uma página no Zapier"],
   ])("1b: %s → %s", (url, texto) => {
     const d = dados(link(url))
     expect(d.lacuna).toBe("link_fora_do_site")
@@ -241,8 +253,8 @@ describe("lacunas", () => {
   })
 
   describe("pergunta própria quando o link vai pra uma página", () => {
-    const PERGUNTA_DA_PAGINA = "Quem te procura por lá chega a ver suas áreas de atuação ou te chama direto?"
-    const PERGUNTA_DA_ADVOCACIA = "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?"
+    const PERGUNTA_DA_PAGINA = "quem te procura por lá chega a ver suas áreas de atuação?"
+    const PERGUNTA_DA_ADVOCACIA = "quem te procura chega direto aqui pelo WhatsApp?"
 
     it.each(["https://linktr.ee/silva", "https://bio.link/silva", "https://silva.jusbrasil.com.br"])(
       "advocacia, página de links ou diretório (%s): troca a pergunta",
@@ -260,14 +272,14 @@ describe("lacunas", () => {
 
     it("nicho sem pergunta própria pra página: fallback pra pergunta do nicho", () => {
       expect(dados({ ...link("https://linktr.ee/doces"), categoria: "Confeitaria" }).pergunta).toBe(
-        "Como vocês tocam as encomendas hoje, tudo por aqui?"
+        "as encomendas que não são feitas no balcão chegam todas aqui pelo WhatsApp?"
       )
     })
 
     it("a mensagem fixa termina na pergunta da lacuna e passa na validação", () => {
       const d = dados(link("https://silva.jusbrasil.com.br"))
       const texto = mensagemFixa(d)
-      expect(texto.split("\n").at(-1)).toBe(PERGUNTA_DA_PAGINA)
+      expect(texto.endsWith(PERGUNTA_DA_PAGINA)).toBe(true)
       expect(validarMensagem(texto, d)).toEqual([])
     })
   })
@@ -442,7 +454,7 @@ describe("âncora", () => {
     const d = dados({ ...SEM_LINK, nome: "Dra. Alana Frota - Advogado Trabalhista em Sobral" })
     expect(d).toMatchObject({
       pessoa: "Alana Frota",
-      ancora: "Procurei o escritório de Alana Frota no Google e achei",
+      ancora: "Tava procurando o escritório de Alana Frota no Google",
       referencia: "Alana Frota",
       tratamento: "você",
     })
@@ -452,7 +464,7 @@ describe("âncora", () => {
     const d = dados({ ...SEM_LINK, nome: "️ Lomonaco & Gomes Escritorio de Advocacia em Fortaleza | Advogado Criminalista" })
     expect(d).toMatchObject({
       pessoa: null,
-      ancora: "Procurei Lomonaco & Gomes no Google e achei",
+      ancora: "Tava procurando Lomonaco & Gomes no Google",
       referencia: "Lomonaco & Gomes",
       tratamento: "vocês",
     })
@@ -462,7 +474,7 @@ describe("âncora", () => {
     const d = dados({ ...SEM_LINK, nome: "Dra. Maria Souza - Dentista", categoria: "Clínica odontológica" })
     expect(d).toMatchObject({
       pessoa: "Maria Souza",
-      ancora: "Procurei Dra. Maria Souza no Google e achei",
+      ancora: "Tava procurando Dra. Maria Souza no Google",
       referencia: "Dra. Maria Souza",
       tratamento: "você",
     })
@@ -498,14 +510,14 @@ describe("validarMensagem", () => {
   })
 
   it("pergunta do nicho tem que estar literal (espaço repetido não importa)", () => {
-    expect(validarMensagem(valida.replace("cai direto no WhatsApp", "vai pro WhatsApp"), d)).toContain(
+    expect(validarMensagem(valida.replace("chega direto aqui", "chega aqui"), d)).toContain(
       "sem_pergunta_do_nicho"
     )
-    expect(validarMensagem(valida.replace("por lá cai", "por lá  cai"), d)).toEqual([])
+    expect(validarMensagem(valida.replace("te procura chega", "te procura  chega"), d)).toEqual([])
   })
 
   it("emoji e markdown", () => {
-    expect(validarMensagem(valida.replace("Bom dia!", "Bom dia! 🙂"), d)).toEqual(["emoji"])
+    expect(validarMensagem(valida.replace("Tava", "🙂 Tava"), d)).toEqual(["emoji"])
     expect(validarMensagem(valida.replace("Silva Advocacia", "*Silva Advocacia*"), d)).toContain("markdown")
   })
 
@@ -536,13 +548,13 @@ describe("validarMensagem", () => {
       expect(validarMensagem(comTrecho(`Vi ${marca} de novo.`), d)).toEqual([motivo])
     })
 
-    it("mais de 2 quebras de linha", () => {
-      expect(validarMensagem(`${valida}\nAbraço.`, d)).toEqual(["marca_de_ia:mais_de_2_quebras"])
+    it("qualquer quebra de linha: a abertura é um parágrafo só", () => {
+      expect(validarMensagem(`${valida}\nAbraço.`, d)).toEqual(["marca_de_ia:mais_de_0_quebras"])
     })
 
     it("linha em branco entre linhas de texto", () => {
-      expect(validarMensagem(valida.replace("Sobral.\n", "Sobral.\n\n"), d)).toContain("marca_de_ia:linha_em_branco")
-      expect(validarMensagem(valida.replace("Sobral.\n", "Sobral.\n  \n"), d)).toContain("marca_de_ia:linha_em_branco")
+      expect(validarMensagem(`${valida}\n\nAbraço.`, d)).toContain("marca_de_ia:linha_em_branco")
+      expect(validarMensagem(`${valida}\n  \nAbraço.`, d)).toContain("marca_de_ia:linha_em_branco")
     })
 
     it("quebra no fim e hífen comum não contam", () => {
@@ -656,7 +668,7 @@ describe("validarMensagem", () => {
   it("descreverMotivo deixa o motivo legível na janela", () => {
     expect(descreverMotivo("permissao:te mando")).toBe('pedido de permissão ("te mando")')
     expect(descreverMotivo("marca_de_ia:travessão")).toBe("travessão")
-    expect(descreverMotivo("marca_de_ia:mais_de_2_quebras")).toBe("mais de 2 quebras de linha")
+    expect(descreverMotivo("marca_de_ia:mais_de_0_quebras")).toBe("mais de 0 quebras de linha")
     expect(descreverMotivo("sem_pergunta_do_nicho")).toBe("a pergunta final mudou")
     expect(descreverMotivo("advocacia:agendamento")).toBe('termo vedado na advocacia ("agendamento")')
   })
@@ -687,7 +699,7 @@ describe("fixtures reais (bloqueadas)", () => {
         "permissao:posso te mandar",
         "mais_de_uma_pergunta",
         "marca_de_ia:linha_em_branco",
-        "marca_de_ia:mais_de_2_quebras",
+        "marca_de_ia:mais_de_0_quebras",
         "sem_pergunta_do_nicho",
       ].sort()
     )
@@ -723,9 +735,8 @@ describe("modelos que eram salvos no banco", () => {
 
   it("abordagem curta: mesma estrutura e mesma pergunta, observação enxuta", () => {
     expect(mensagemFixa(d, "curta")).toBe(
-      "Bom dia! Aqui é o Leonardo, de Sobral.\n" +
-        "Procurei o escritório de Luiz Carlos no Google e achei, mas não tem site.\n" +
-        "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?"
+      "Tava procurando o escritório de Luiz Carlos no Google e vi que não tem site. " +
+        "Fiquei curioso: quem te procura chega direto aqui pelo WhatsApp?"
     )
     expect(validarMensagem(mensagemFixa(d, "curta"), d)).toEqual([])
   })
@@ -802,7 +813,7 @@ describe("mensagemParaJanela", () => {
   const ouro = mensagemFixa(dados(LUIZ))
   const validacao = {
     referencia: "Luiz Carlos",
-    pergunta: "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?",
+    pergunta: "quem te procura chega direto aqui pelo WhatsApp?",
     nicho: "advocacia",
   }
 
@@ -831,6 +842,7 @@ describe("mensagemParaJanela", () => {
     expect(await mensagemParaJanela(LUIZ, MANHA, "completa")).toEqual({
       tipo: "pronta",
       lacuna: "sem_site",
+      saudacao: "Bom dia! Tudo bem?",
       texto: ouro,
       origem: "fixa",
       bloqueios: [],
@@ -857,7 +869,7 @@ describe("mensagemParaJanela", () => {
 
   it("Gemini com a mensagem certa mas a pergunta reescrita: bloqueado por 'sem a pergunta do nicho'", async () => {
     const reescrita = ouro.replace(
-      "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?",
+      "quem te procura chega direto aqui pelo WhatsApp?",
       "Quem procura vocês por lá vai direto pro WhatsApp ou vê alguma página antes?"
     )
     const r = await mensagemParaJanela(LUIZ, MANHA, "gemini", {}, vi.fn().mockResolvedValue(reescrita))
@@ -870,7 +882,7 @@ describe("mensagemParaJanela", () => {
   })
 
   it("Gemini com travessão: bloqueado por marca de IA", async () => {
-    const comTravessao = ouro.replace("e achei, mas", "e achei — mas")
+    const comTravessao = ouro.replace("no Google e vi", "no Google — e vi")
     const r = await mensagemParaJanela(LUIZ, MANHA, "gemini", {}, vi.fn().mockResolvedValue(comTravessao))
     if (r.tipo !== "pronta") throw new Error("esperava pronta")
     expect(r.origem).toBe("fixa")
@@ -978,7 +990,7 @@ describe("config", () => {
     expect(Object.keys(CATEGORIA_DO_NICHO).sort()).toEqual([...NICHOS, NICHO_PADRAO].map((n) => n.id).sort())
   })
 
-  it("a mensagem fixa (completa e curta) de toda combinação permitida passa na validação, em 3 linhas", () => {
+  it("a mensagem fixa (completa e curta) de toda combinação permitida passa na validação, num parágrafo", () => {
     for (const nicho of [...NICHOS, NICHO_PADRAO]) {
       const variantes = nicho.comercio ? [...DO_SITE, ...DE_COMERCIO] : DO_SITE
       for (const variante of variantes) {
@@ -986,7 +998,7 @@ describe("config", () => {
         for (const formato of ["completa", "curta"] as const) {
           const texto = mensagemFixa(d, formato)
           expect({ texto, motivos: validarMensagem(texto, d) }).toEqual({ texto, motivos: [] })
-          expect(texto.split("\n")).toHaveLength(3)
+          expect(texto).not.toContain("\n")
           expect(texto).not.toMatch(/[—–…]|\.\.\.|\n\s*\n/)
         }
       }
@@ -1041,5 +1053,105 @@ describe("os 100 leads reais", () => {
       // os 2 sites que responderam 404 e 500: medição inconclusiva, dá pra rever
       manual: 2,
     })
+  })
+})
+
+// Mensagem 3: a que só existe depois que o lead responde a abertura.
+describe("apresentacao", () => {
+  const NICHOS_COM_TEXTO = Object.keys(APRESENTACAO_POR_NICHO)
+  const TODOS = [...NICHOS_COM_TEXTO, NICHO_PADRAO.id]
+
+  it("todo nicho da abertura tem apresentação, e nicho desconhecido cai no padrão", () => {
+    // Nicho novo em nichos.ts sem entrada aqui cai no padrão em vez de quebrar,
+    // mas o ideal é ter a dele: este teste é o lembrete.
+    expect(NICHOS.map((n) => n.id).filter((id) => !NICHOS_COM_TEXTO.includes(id))).toEqual([])
+    expect(apresentacaoDoNicho("nicho que não existe")).toContain(APRESENTACAO_PADRAO.comoFunciona)
+    expect(apresentacaoDoNicho(NICHO_PADRAO.id)).toContain(APRESENTACAO_PADRAO.comoFunciona)
+  })
+
+  it("cada apresentação passa nas próprias regras, no nicho dela", () => {
+    for (const nicho of TODOS) {
+      expect([nicho, validarApresentacao(apresentacaoDoNicho(nicho), nicho)]).toEqual([nicho, []])
+    }
+  })
+
+  it("três parágrafos, uma pergunta só, e a empresa em todas", () => {
+    for (const nicho of TODOS) {
+      const paragrafos = apresentacaoDoNicho(nicho).split("\n\n")
+      expect([nicho, paragrafos]).toEqual([nicho, expect.any(Array)])
+      expect([nicho, paragrafos.length]).toEqual([nicho, 3])
+      // Parágrafo, não linha solta: nenhum deles tem quebra dentro
+      for (const paragrafo of paragrafos) expect(paragrafo).not.toContain("\n")
+      const texto = apresentacaoDoNicho(nicho)
+      expect([nicho, (texto.match(/\?/g) ?? []).length]).toEqual([nicho, 1])
+      expect(texto).toContain(REMETENTE.empresa)
+      expect(texto.trimEnd().endsWith("?")).toBe(true)
+    }
+  })
+
+  it("o primeiro e o último parágrafo são os mesmos em todo nicho", () => {
+    for (const nicho of TODOS) {
+      const [primeiro, , ultimo] = apresentacaoDoNicho(nicho).split("\n\n")
+      expect([nicho, primeiro]).toEqual([nicho, ABERTURA_DA_APRESENTACAO])
+      expect([nicho, ultimo]).toEqual([nicho, FECHAMENTO_DA_APRESENTACAO])
+    }
+  })
+
+  it("o ramo vem da categoria do lead, que é mais específica que o nicho", () => {
+    expect(apresentacaoDoNicho("alimentacao", "Pizzaria")).toContain("Pra pizzaria funcionaria assim")
+    expect(apresentacaoDoNicho("varejo", "Loja de materiais de construção")).toContain(
+      "Pra loja de materiais de construção funcionaria assim"
+    )
+    // Categoria vazia ou que não diz o ramo: vale o do nicho
+    expect(ramoDaApresentacao("alimentacao", null)).toBe(APRESENTACAO_POR_NICHO.alimentacao.ramo)
+    expect(ramoDaApresentacao("alimentacao", "Escritório da empresa")).toBe(APRESENTACAO_POR_NICHO.alimentacao.ramo)
+    expect(ramoDaApresentacao("alimentacao", "  ")).toBe(APRESENTACAO_POR_NICHO.alimentacao.ramo)
+  })
+
+  it("a apresentação diz o que o remetente faz, o que a abertura não podia dizer", () => {
+    const texto = apresentacaoDoNicho("alimentacao")
+    expect(validarApresentacao(texto, "alimentacao")).toEqual([])
+    // A mesma mensagem na régua da abertura seria barrada
+    expect(validarConteudo(texto, "alimentacao")).toContain("permissao:posso te mandar")
+  })
+
+  it("oferta e permissão são liberadas; promessa e elogio continuam barradas", () => {
+    expect(validarApresentacao("Eu faço a página de vocês.")).toEqual([])
+    expect(validarApresentacao("Fica R$ 500 e o link é http://exemplo.com")).toEqual([])
+    expect(validarApresentacao("Posso te mandar um exemplo?")).toEqual([])
+    expect(validarApresentacao("Isso vai te trazer mais clientes.")).toEqual(["promessa:mais clientes"])
+    expect(validarApresentacao("Adorei o atendimento de vocês.")).toEqual(["elogio:adorei"])
+  })
+
+  it("a trava do nicho continua valendo na apresentação", () => {
+    expect(validarApresentacao("Eu faço a página do agendamento.", "advocacia")).toEqual(["advocacia:agendamento"])
+    expect(validarApresentacao("Eu faço a página do agendamento.", "agendamento")).toEqual([])
+  })
+
+  it("advocacia não fala de agenda nem de avaliação, e as outras não herdam a trava dela", () => {
+    expect(validarApresentacao(apresentacaoDoNicho("advocacia"), "advocacia")).toEqual([])
+    for (const termo of TERMOS_BLOQUEADOS_POR_NICHO.advocacia ?? []) {
+      expect(apresentacaoDoNicho("advocacia").toLowerCase(), termo).not.toContain(termo)
+    }
+    // Nem preço, nem pedido, nem caixa: o parágrafo da advocacia é o único assim
+    expect(apresentacaoDoNicho("advocacia")).not.toMatch(/preço|pedido|caixa/)
+    expect(apresentacaoDoNicho("agendamento")).toMatch(/preço|caixa/)
+  })
+
+  it("escrita: sem emoji, sem markdown, sem marca de IA, e mais folgada que a abertura", () => {
+    expect(validarApresentacao("Eu faço a sua página, com o cardápio — e o preço.")).toEqual([
+      "marca_de_ia:travessão",
+    ])
+    expect(validarApresentacao("Eu faço a sua página 🙂")).toEqual(["emoji"])
+    // Linha em branco é o formato aqui, e marca de IA na abertura
+    const tresParagrafos = "um\n\ndois\n\ntrês"
+    expect(validarApresentacao(tresParagrafos)).toEqual([])
+    expect(validarConteudo(tresParagrafos)).toContain("marca_de_ia:linha_em_branco")
+    expect(validarApresentacao("um\n\ndois\n\ntrês\n\nquatro")).toEqual(["marca_de_ia:mais_de_4_quebras"])
+  })
+
+  it("passa de 900 caracteres não sai", () => {
+    expect(validarApresentacao("a".repeat(900))).toEqual([])
+    expect(validarApresentacao("a".repeat(901))).toEqual(["passa_de_900_caracteres"])
   })
 })

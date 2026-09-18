@@ -77,9 +77,8 @@ describe("itemDaLista", () => {
   it("lead com lacuna: mensagem da mesma camada 1 da janela, e registro pra gravar", () => {
     const r = item({ ...SEM_SITE, nome: "LUIZ CARLOS SILVA ADVOCACIA" })
     expect(r.texto).toBe(
-      "Bom dia! Aqui é o Leonardo, de Sobral.\n" +
-        "Procurei o escritório de Luiz Carlos no Google e achei, mas não tem site, só o telefone.\n" +
-        "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?"
+      "Tava procurando o escritório de Luiz Carlos no Google e vi que não tem site, só o telefone. " +
+        "Fiquei curioso: quem te procura chega direto aqui pelo WhatsApp?"
     )
     expect(r.motivo).toBeNull()
     expect(r.registro).toEqual({
@@ -133,9 +132,8 @@ describe("itemDaLista", () => {
     expect(item({ ...SEM_SITE, etapa })).toMatchObject({ texto: "", motivo: "etapa não é de abordagem" })
   })
 
-  it("a saudação é a escolhida, não a do horário de agora", () => {
-    const noite = itemDaLista(lead(SEM_SITE), { faixa: SAUDACOES[2], agora: MANHA })
-    expect(noite.texto.startsWith("Boa noite! Aqui é o Leonardo, de Sobral.")).toBe(true)
+  it("a saudação da mensagem 1 é a escolhida, não a do horário de agora", () => {
+    expect(cabecalhoDaLista(SAUDACOES[2], 1)).toContain('"Boa noite! Tudo bem?"')
   })
 
   it("nicho pelo termo da busca quando a categoria do Google é genérica", () => {
@@ -158,13 +156,17 @@ describe("listaExportada", () => {
     const { texto, itens } = listaExportada(leads, { faixa: FAIXA, agora: MANHA })
     expect(itens).toHaveLength(2)
     expect(texto.split("\n\n")).toHaveLength(3)
-    expect(texto.startsWith('Saudação: "Bom dia!" (para enviar entre 08:00 e 12:00) — 2 leads')).toBe(true)
-    expect(texto).toContain('Mensagem: "" (sem gancho automático)')
+    expect(
+      texto.startsWith('Mensagem 1, antes de cada uma (para enviar entre 08:00 e 12:00): "Bom dia! Tudo bem?" — 2 leads')
+    ).toBe(true)
+    expect(texto).toContain('Mensagem 2: "" (sem gancho automático)')
     expect(texto).not.toContain("Sem Telefone Advogados")
   })
 
   it("cabeçalho sozinho", () => {
-    expect(cabecalhoDaLista(SAUDACOES[1], 7)).toBe('Saudação: "Boa tarde!" (para enviar entre 12:00 e 18:00) — 7 leads')
+    expect(cabecalhoDaLista(SAUDACOES[1], 7)).toBe(
+      'Mensagem 1, antes de cada uma (para enviar entre 12:00 e 18:00): "Boa tarde! Tudo bem?" — 7 leads'
+    )
   })
 
   it("anti-repetição conta o que já foi registrado e o que a própria lista gerou", () => {

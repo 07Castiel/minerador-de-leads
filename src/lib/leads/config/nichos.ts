@@ -14,7 +14,9 @@ export type NichoDaAbordagem = {
   rotulo?: string
   // Trechos procurados na categoria (ou no termo da busca), sem acento e em minúsculas
   termos: readonly string[]
-  // Texto fixo: o Gemini não reescreve
+  // Texto fixo: o Gemini não reescreve. Entra depois de "Fiquei curioso:", então
+  // começa em minúscula. É pergunta de sim ou não de propósito: o "sim" é o
+  // gancho da apresentação, e quem responde "não" já diz o que faz em vez disso.
   pergunta: string
   // Poucas fotos e pouca avaliação só servem de gancho em comércio
   comercio?: boolean
@@ -28,10 +30,10 @@ export const NICHOS: readonly NichoDaAbordagem[] = [
     id: "advocacia",
     rotulo: "Advocacia",
     termos: ["advog", "advocacia", "juridic", "direito"],
-    pergunta: "Quem te procura por lá cai direto no WhatsApp ou vocês mandam alguma página antes?",
+    pergunta: "quem te procura chega direto aqui pelo WhatsApp?",
     // Sem "Dr."/"Dra.": no banco tem "Dr. Joana D'arc", então nem o título do
     // próprio nome garante o gênero. "de {PESSOA}" não precisa de artigo.
-    ancoraComPessoa: "Procurei o escritório de {PESSOA} no Google e achei",
+    ancoraComPessoa: "Tava procurando o escritório de {PESSOA} no Google",
   },
   {
     id: "alimentacao",
@@ -54,7 +56,7 @@ export const NICHOS: readonly NichoDaAbordagem[] = [
       // "Delivery de Pizza" (cobre "Pizzaria" também)
       "pizza",
     ],
-    pergunta: "Como vocês tocam as encomendas hoje, tudo por aqui?",
+    pergunta: "as encomendas que não são feitas no balcão chegam todas aqui pelo WhatsApp?",
     comercio: true,
   },
   {
@@ -80,7 +82,7 @@ export const NICHOS: readonly NichoDaAbordagem[] = [
       "lava rapido",
       "pneu",
     ],
-    pergunta: "Os agendamentos ficam tudo no WhatsApp?",
+    pergunta: "os horários que vocês marcam chegam todos aqui pelo WhatsApp?",
     comercio: true,
   },
   {
@@ -88,7 +90,7 @@ export const NICHOS: readonly NichoDaAbordagem[] = [
     rotulo: "Varejo",
     // Material de construção vende por balcão e orçamento, como o resto do varejo
     termos: ["loja", "varejo", "boutique", "construcao", "construtora", "deposito", "fabricante"],
-    pergunta: "Quando perguntam preço você manda foto na hora?",
+    pergunta: "quando perguntam preço, vocês mandam foto uma por uma aqui?",
     comercio: true,
   },
 ]
@@ -96,7 +98,7 @@ export const NICHOS: readonly NichoDaAbordagem[] = [
 export const NICHO_PADRAO: NichoDaAbordagem = {
   id: "outros",
   termos: [],
-  pergunta: "É assim mesmo hoje?",
+  pergunta: "é tudo por aqui mesmo?",
 }
 
 // Categorias do Google que não dizem o ramo (comparadas sem acento e em minúsculas).
