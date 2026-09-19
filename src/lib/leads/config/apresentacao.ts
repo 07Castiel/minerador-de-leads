@@ -57,6 +57,45 @@ export const APRESENTACAO_POR_NICHO: Record<string, ApresentacaoDoNicho> = {
     comoFunciona:
       "o cliente abre um catálogo com a foto e o preço de cada produto, monta o pedido e ele já chega prontinho aqui no WhatsApp, sem você mandar foto uma por uma. Por trás, vocês têm um painel pra controlar pedidos, estoque e caixa num lugar só.",
   },
+  pet: {
+    ramo: "pet shop",
+    comoFunciona:
+      "o cliente vê os serviços com preço, escolhe um horário livre pro banho e tosa e a reserva já chega prontinha aqui no WhatsApp, sem aquele vai e vem pra achar encaixe. Por trás, vocês têm um painel com a agenda do dia, os clientes e o caixa num lugar só.",
+  },
+  fitness: {
+    ramo: "academia",
+    comoFunciona:
+      "quem quer treinar vê os planos, os horários das aulas e manda a matrícula prontinha aqui no WhatsApp, sem precisar passar na recepção só pra perguntar. Por trás, vocês têm um painel com os alunos, as mensalidades e o caixa num lugar só.",
+  },
+  educacao: {
+    ramo: "quem dá aula",
+    comoFunciona:
+      "quem procura vaga vê os cursos, os horários das turmas e o que precisa pra entrar, e a matrícula já chega prontinha aqui no WhatsApp. Por trás, vocês têm um painel com os alunos, as turmas e as mensalidades num lugar só.",
+  },
+  hospedagem: {
+    ramo: "quem recebe hóspede",
+    comoFunciona:
+      "o hóspede vê as fotos dos quartos, a diária e as datas livres, e a reserva já chega prontinha aqui no WhatsApp, sem aquele vai e vem pra confirmar se tem vaga. Por trás, vocês têm um painel com a ocupação, as reservas e o caixa num lugar só.",
+  },
+  imobiliario: {
+    ramo: "quem vende imóvel",
+    comoFunciona:
+      "o interessado vê as fotos e os detalhes de cada imóvel, filtra pelo que cabe no bolso dele e o contato já chega prontinho aqui no WhatsApp, dizendo qual imóvel ele viu. Por trás, vocês têm um painel com a carteira de imóveis, os interessados e as visitas num lugar só.",
+  },
+  servico_tecnico: {
+    ramo: "quem atende chamado",
+    comoFunciona:
+      "o cliente vê o que vocês resolvem e a região que atendem, e o chamado já chega prontinho aqui no WhatsApp, com o problema descrito. Por trás, vocês têm um painel com os chamados do dia, os atendimentos feitos e o caixa num lugar só.",
+  },
+  // Mesma regra da advocacia, e pelo mesmo motivo: CFM, CFO e CFP restringem
+  // publicidade apoiada em avaliação, depoimento e promessa de resultado. Por
+  // isso este parágrafo não fala de pedido, preço nem caixa: do lado de fora,
+  // especialidade e horário; do lado de dentro, a rotina de quem atende.
+  saude: {
+    ramo: "quem atende paciente",
+    comoFunciona:
+      "quem procura vocês vê as especialidades e os horários de atendimento antes de chamar, então chega aqui já sabendo o que vocês fazem. Por trás, vocês têm um painel com a agenda do dia, os retornos e o cadastro dos pacientes num lugar só.",
+  },
   // A OAB restringe captação de clientela, não informação. Por isso este é o
   // único parágrafo que não fala de pedido, preço nem caixa: do lado de fora,
   // área de atuação e formação; do lado de dentro, o trabalho do escritório.

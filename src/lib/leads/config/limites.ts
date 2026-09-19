@@ -121,6 +121,19 @@ export const TERMOS_DE_PALAVRA_INTEIRA: readonly string[] = ["top", "monto", "te
 // Só num nicho. Advocacia: agendamento e avaliação de cliente como argumento
 // soam como captação de clientela, que o código de ética da OAB restringe.
 export const TERMOS_BLOQUEADOS_POR_NICHO: Partial<Record<string, readonly string[]>> = {
+  // Saúde: CFM, CFO e CFP restringem publicidade que se apoie em avaliação,
+  // depoimento ou promessa de resultado. O nicho já não usa foto e avaliação
+  // como gancho (nichos.ts), e isto aqui é a rede: vale também pro texto
+  // redigido pelo Gemini e pro texto editado à mão antes de enviar.
+  saude: [
+    "avalia bem",
+    "avalia super bem",
+    "avaliações ótimas",
+    "boas avaliações",
+    "antes e depois",
+    "resultado garantido",
+    "tratamento garantido",
+  ],
   advocacia: [
     "agendar consulta",
     "agendamento",

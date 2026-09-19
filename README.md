@@ -202,9 +202,22 @@ muda por nicho, e o "Pra {RAMO} funcionaria assim" usa a categoria do Google do
 lead ("Pra pizzaria"), com o ramo do nicho como reserva. `validarApresentacao`
 usa a mesma régua de escrita da abertura, com 900 caracteres, 4 quebras de linha
 e linha em branco permitida, e libera os grupos `oferta` e `permissao` - promessa
-de resultado, elogio e a trava da advocacia continuam valendo. A da advocacia
+de resultado, elogio e as travas de nicho continuam valendo. A da advocacia
 fala de área de atuação e formação, e nunca de agenda, preço ou avaliação, que é
-onde o código de ética restringe.
+onde o código de ética restringe. A da saúde segue a mesma régua, pelo mesmo
+motivo: CFM, CFO e CFP restringem publicidade apoiada em avaliação, depoimento e
+promessa de resultado.
+
+**Nichos da abordagem** (`src/lib/leads/config/nichos.ts`), onze mais o padrão,
+resolvidos nesta ordem porque vale o primeiro termo que casar: `advocacia`,
+`saude`, `pet`, `alimentacao`, `agendamento`, `fitness`, `educacao`,
+`hospedagem`, `imobiliario`, `servico_tecnico`, `varejo`. Cada um muda a
+pergunta do final da abertura, o parágrafo do meio da apresentação e se foto e
+avaliação podem virar gancho (`comercio`). Só `advocacia` e `saude` têm âncora
+própria com o nome da pessoa, porque "o escritório de" e "o consultório de"
+carregam o gênero e o nome pode ir sem título. Ordem importa: `saude` vem antes
+de `agendamento` (senão "Clínica odontológica" cairia em "clinica" lá) e `pet`
+antes das duas (senão "Clínica veterinária" viraria consultório).
 
 Os testes usam as mensagens reais do fluxo antigo e os 100 leads reais
 (`src/lib/leads/fixtures/leads-reais.json`). Precisa de `GEMINI_API_KEY`.

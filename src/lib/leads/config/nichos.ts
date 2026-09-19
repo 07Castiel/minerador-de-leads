@@ -36,6 +36,53 @@ export const NICHOS: readonly NichoDaAbordagem[] = [
     ancoraComPessoa: "Tava procurando o escritório de {PESSOA} no Google",
   },
   {
+    id: "saude",
+    rotulo: "Saúde",
+    // Vem antes de "agendamento" de propósito: "Clínica odontológica" e
+    // "Dentista" casavam com "clinica"/"dentist" lá e herdavam comercio: true,
+    // que libera foto e avaliação como gancho. São 80 leads no banco (o segundo
+    // maior grupo, depois de beleza), e hoje 5 deles cairiam nesse gancho.
+    // A agenda é a mesma de uma barbearia; o que não é igual é o que se pode
+    // usar de argumento: CFM, CFO e CFP restringem publicidade que se apoie em
+    // avaliação e depoimento de paciente, como a OAB faz com a captação.
+    // Sem "clinica" e sem "medico" soltos: "Clínica de estética" continua em
+    // agendamento, e uma loja de produtos médicos não vira consultório.
+    termos: [
+      "clinica medica",
+      "clinica odontologica",
+      "odontolog",
+      "dentist",
+      "ortodont",
+      "fisioterap",
+      "psicolog",
+      "psiquiatr",
+      "nutricion",
+      "consultorio",
+      "laboratorio de analises",
+      "pediatr",
+      "dermatolog",
+      "oftalmolog",
+    ],
+    // Sem "consulta" e sem citar avaliação: a pergunta é sobre o caminho de
+    // quem procura, não sobre a reputação de quem atende.
+    pergunta: "quem precisa marcar um horário com vocês resolve tudo por aqui?",
+    // Sem comercio: foto e avaliação não entram como gancho neste nicho.
+    // "o consultório de {PESSOA}": o substantivo carrega o gênero, então
+    // "Dra. Joana" e "Dr. João" saem certos, igual ao escritório da advocacia.
+    ancoraComPessoa: "Tava procurando o consultório de {PESSOA} no Google",
+  },
+  {
+    id: "pet",
+    rotulo: "Pet",
+    // Antes de "saude" e de "agendamento": "Clínica veterinária" casaria com
+    // "clinica" lá, e o dono de pet shop não é médico de gente - a trava dos
+    // conselhos não se aplica, e foto do bichinho é gancho legítimo.
+    // "pet" solto não dá: "tapete" e "carpete" contêm "pet".
+    termos: ["pet shop", "petshop", "veterinari", "banho e tosa", "agropecuari"],
+    pergunta: "quem quer marcar um banho e tosa chega aqui pelo WhatsApp?",
+    comercio: true,
+  },
+  {
     id: "alimentacao",
     rotulo: "Alimentação",
     termos: [
@@ -49,7 +96,9 @@ export const NICHOS: readonly NichoDaAbordagem[] = [
       "hamburgueria",
       "acai",
       "sorveteria",
-      "cafeteria",
+      // "cafe" no lugar de "cafeteria": cobre as duas, e "Café" sozinho (1 lead
+      // no banco) caía em "outros" só por causa da terminação.
+      "cafe",
       "bolo",
       "salgado",
       "marmita",
@@ -68,9 +117,8 @@ export const NICHOS: readonly NichoDaAbordagem[] = [
       "clinica",
       "oficina",
       "mecanica",
-      // Dentista, Cirurgião dentista, Ortodontista
-      "dentist",
-      "ortodont",
+      // Dentista e ortodontista saíram daqui para o nicho "saude": o que muda
+      // não é a agenda marcada, é o que pode virar argumento (ver lá).
       // Manicure e depilação: mesma agenda de horário marcado
       "manicure",
       "depilacao",
@@ -80,16 +128,84 @@ export const NICHOS: readonly NichoDaAbordagem[] = [
       "funilaria",
       "lava-rapido",
       "lava rapido",
+      // Mesmo negócio, o outro nome: "Lava-jato" está nas sugestões da busca
+      "lava-jato",
+      "lava jato",
       "pneu",
     ],
     pergunta: "os horários que vocês marcam chegam todos aqui pelo WhatsApp?",
     comercio: true,
   },
   {
+    id: "fitness",
+    rotulo: "Academia",
+    // "estudio" solto ficaria com "Estúdio de tatuagem", que não vende plano.
+    termos: ["academia", "pilates", "crossfit", "musculacao", "personal trainer", "estudio de pilates"],
+    pergunta: "quem quer conhecer os planos de vocês chega aqui pelo WhatsApp?",
+    comercio: true,
+  },
+  {
+    id: "educacao",
+    rotulo: "Educação",
+    // "escola" pega "Autoescola" e "Pré-escola"; "curso" pega "Curso de inglês"
+    // e também "Preparatório para concursos", que é ensino do mesmo jeito.
+    termos: ["escola", "curso", "idiomas", "creche", "bercario", "reforco escolar"],
+    // Sem comercio: numa escola, "quase não tem avaliação" é gancho ruim - a
+    // matrícula é decisão de pai, e a reputação é assunto sensível.
+    pergunta: "quem procura vaga chega aqui pelo WhatsApp?",
+  },
+  {
+    id: "hospedagem",
+    rotulo: "Hospedagem",
+    termos: ["hotel", "pousada", "hostel", "chale", "resort"],
+    pergunta: "as reservas de vocês chegam todas aqui pelo WhatsApp?",
+    comercio: true,
+  },
+  {
+    id: "imobiliario",
+    rotulo: "Imobiliário",
+    // "imovei"/"imovel", nunca "movei": "Loja de móveis" é varejo.
+    termos: ["imobiliaria", "corretor de imovei", "imovei", "imovel", "incorporadora"],
+    // Sem ancoraComPessoa: "o corretor {PESSOA}" erra o gênero, e não existe
+    // substantivo neutro pra carregar o nome como "o escritório de".
+    pergunta: "quem se interessa por um imóvel chega aqui pelo WhatsApp?",
+    comercio: true,
+  },
+  {
+    id: "servico_tecnico",
+    // Sem rotulo: junta ramos diferentes demais pra virar uma linha só na
+    // lista exportada, igual a "agendamento".
+    termos: [
+      "chaveiro",
+      "eletricista",
+      "encanador",
+      "dedetiz",
+      "assistencia tecnica",
+      "refrigeracao",
+      "ar condicionado",
+      "vidracaria",
+      "serralheria",
+    ],
+    // Sem comercio: um chaveiro sem foto no perfil não é gancho - ninguém
+    // escolhe chaveiro por foto.
+    pergunta: "quando precisam de vocês, o chamado chega aqui pelo WhatsApp?",
+  },
+  {
     id: "varejo",
     rotulo: "Varejo",
     // Material de construção vende por balcão e orçamento, como o resto do varejo
-    termos: ["loja", "varejo", "boutique", "construcao", "construtora", "deposito", "fabricante"],
+    termos: [
+      "loja",
+      "varejo",
+      // O Google devolve as duas grafias; só com "boutique" o "Butique" (1 lead
+      // no banco) ficava em "outros".
+      "boutique",
+      "butique",
+      "construcao",
+      "construtora",
+      "deposito",
+      "fabricante",
+    ],
     pergunta: "quando perguntam preço, vocês mandam foto uma por uma aqui?",
     comercio: true,
   },

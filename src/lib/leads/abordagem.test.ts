@@ -130,15 +130,37 @@ describe("resolverNicho", () => {
     ["Loja de doces", "alimentacao"],
     ["Barbearia", "agendamento"],
     ["Salão de beleza", "agendamento"],
-    ["Clínica odontológica", "agendamento"],
+    ["Clínica odontológica", "saude"],
     ["Oficina mecânica", "agendamento"],
     ["Loja de roupas", "varejo"],
     ["Escritório da empresa", "outros"],
     [null, "outros"],
     // Categorias que o Google deu na rodada do Ceará, cada uma no nicho-mãe
-    ["Dentista", "agendamento"],
-    ["Cirurgião dentista", "agendamento"],
-    ["Ortodontista", "agendamento"],
+    ["Dentista", "saude"],
+    ["Cirurgião dentista", "saude"],
+    ["Ortodontista", "saude"],
+    // "clinica" continua em agendamento: estética não é profissão de conselho
+    // com trava de publicidade, e a agenda é a mesma do salão.
+    ["Clínica de estética", "agendamento"],
+    // Veterinária casaria com "clinica"; "pet" vem antes de propósito.
+    ["Clínica veterinária", "pet"],
+    ["Pet shop", "pet"],
+    ["Academia", "fitness"],
+    ["Estúdio de pilates", "fitness"],
+    ["Escola de idiomas", "educacao"],
+    ["Autoescola", "educacao"],
+    ["Hotel", "hospedagem"],
+    ["Pousada", "hospedagem"],
+    ["Imobiliária", "imobiliario"],
+    ["Corretor de imóveis", "imobiliario"],
+    // "imovei" não pode pegar "móveis"
+    ["Loja de móveis", "varejo"],
+    ["Chaveiro", "servico_tecnico"],
+    ["Assistência técnica", "servico_tecnico"],
+    // "Assistência jurídica" é advocacia: advocacia vem antes
+    ["Assistência jurídica", "advocacia"],
+    // Estúdio de tatuagem não vende plano: "estudio" solto ficaria com ele
+    ["Estúdio de tatuagem", "outros"],
     ["Manicure", "agendamento"],
     ["Serviço de depilação a cera", "agendamento"],
     ["Borracharia", "agendamento"],
@@ -157,11 +179,15 @@ describe("resolverNicho", () => {
     ["Posto de combustível", "outros"],
     ["Estacionamento", "outros"],
     ["Feira de automóveis", "outros"],
-    ["Café", "outros"],
     ["Bar", "outros"],
     ["Supermercado", "outros"],
     ["Mercado", "outros"],
-    ["Butique", "outros"],
+    // Não ficavam de fora por serem outro tipo de negócio, e sim por causa da
+    // grafia que o Google devolve: "cafeteria" não pega "Café", e a lista só
+    // tinha "boutique".
+    ["Café", "alimentacao"],
+    ["Cafeteria", "alimentacao"],
+    ["Butique", "varejo"],
   ])("categoria %s → %s", (categoria, nicho) => {
     expect(resolverNicho(categoria).id).toBe(nicho)
   })
@@ -180,7 +206,8 @@ describe("resolverNicho", () => {
   })
 
   it("3. nada casa: outros", () => {
-    expect(resolverNicho("Escritório da empresa", "Pet shop").id).toBe("outros")
+    // "Floricultura" está nas sugestões da busca e ainda não tem nicho próprio
+    expect(resolverNicho("Escritório da empresa", "Floricultura").id).toBe("outros")
     expect(resolverNicho("Escritório da empresa").id).toBe("outros")
   })
 
@@ -204,6 +231,15 @@ describe("resolverNicho", () => {
     expect(resolverNicho("Confeitaria").pergunta).toBe("as encomendas que não são feitas no balcão chegam todas aqui pelo WhatsApp?")
     expect(resolverNicho("Barbearia").pergunta).toBe("os horários que vocês marcam chegam todos aqui pelo WhatsApp?")
     expect(resolverNicho("Loja de roupas").pergunta).toBe("quando perguntam preço, vocês mandam foto uma por uma aqui?")
+    expect(resolverNicho("Dentista").pergunta).toBe(
+      "quem precisa marcar um horário com vocês resolve tudo por aqui?"
+    )
+    expect(resolverNicho("Pet shop").pergunta).toBe("quem quer marcar um banho e tosa chega aqui pelo WhatsApp?")
+    expect(resolverNicho("Academia").pergunta).toBe("quem quer conhecer os planos de vocês chega aqui pelo WhatsApp?")
+    expect(resolverNicho("Escola de idiomas").pergunta).toBe("quem procura vaga chega aqui pelo WhatsApp?")
+    expect(resolverNicho("Pousada").pergunta).toBe("as reservas de vocês chegam todas aqui pelo WhatsApp?")
+    expect(resolverNicho("Imobiliária").pergunta).toBe("quem se interessa por um imóvel chega aqui pelo WhatsApp?")
+    expect(resolverNicho("Chaveiro").pergunta).toBe("quando precisam de vocês, o chamado chega aqui pelo WhatsApp?")
     expect(resolverNicho(null).pergunta).toBe("é tudo por aqui mesmo?")
   })
 })
@@ -371,6 +407,21 @@ describe("lacunas", () => {
     })
   })
 
+  it("saúde e escola também ficam fora de 3 e 5; o pet shop ao lado continua dentro", () => {
+    // Mesma falta, nichos diferentes: numa clínica, "quase não tem avaliação"
+    // é argumento apoiado em avaliação de paciente, que os conselhos restringem.
+    const poucas = { fotos_count: 1, google_avaliacoes_count: 0 }
+    expect(preparar({ ...poucas, categoria: "Clínica odontológica" })).toMatchObject({
+      tipo: "descartado_sem_gancho",
+      nicho: "saude",
+    })
+    expect(preparar({ ...poucas, categoria: "Escola de idiomas" })).toMatchObject({
+      tipo: "descartado_sem_gancho",
+      nicho: "educacao",
+    })
+    expect(dados({ ...poucas, categoria: "Pet shop" })).toMatchObject({ lacuna: "poucas_fotos", nicho: "pet" })
+  })
+
   it("horário desconhecido não vira lacuna (lacuna 2 desligada)", () => {
     expect(preparar({}).tipo).toBe("descartado_sem_gancho")
   })
@@ -470,12 +521,23 @@ describe("âncora", () => {
     })
   })
 
-  it("outro nicho com pessoa: âncora pelo negócio, tratamento você", () => {
+  it("saúde com pessoa: procurei o consultório de {PESSOA}, mesma saída da advocacia", () => {
     const d = dados({ ...SEM_LINK, nome: "Dra. Maria Souza - Dentista", categoria: "Clínica odontológica" })
     expect(d).toMatchObject({
       pessoa: "Maria Souza",
-      ancora: "Tava procurando Dra. Maria Souza no Google",
-      referencia: "Dra. Maria Souza",
+      // "o consultório de" carrega o gênero, então "Dra." pode cair fora
+      ancora: "Tava procurando o consultório de Maria Souza no Google",
+      referencia: "Maria Souza",
+      tratamento: "você",
+    })
+  })
+
+  it("nicho sem âncora própria, com pessoa: o nome vai inteiro, com o título", () => {
+    const d = dados({ ...SEM_LINK, nome: "Dr. Fernando - Veterinário", categoria: "Clínica veterinária" })
+    expect(d).toMatchObject({
+      pessoa: "Fernando",
+      ancora: "Tava procurando Dr. Fernando no Google",
+      referencia: "Dr. Fernando",
       tratamento: "você",
     })
   })
@@ -962,8 +1024,15 @@ describe("config", () => {
   const LONGO = { nome: "Advocacia Trabalhista e Previdenciária João Simplício" }
   const CATEGORIA_DO_NICHO: Record<string, string> = {
     advocacia: "Advogado",
+    saude: "Clínica odontológica",
+    pet: "Pet shop",
     alimentacao: "Confeitaria",
     agendamento: "Barbearia",
+    fitness: "Academia",
+    educacao: "Escola de idiomas",
+    hospedagem: "Pousada",
+    imobiliario: "Imobiliária",
+    servico_tecnico: "Chaveiro",
     varejo: "Loja de roupas",
     outros: "Escritório da empresa",
   }
@@ -1133,9 +1202,19 @@ describe("apresentacao", () => {
     for (const termo of TERMOS_BLOQUEADOS_POR_NICHO.advocacia ?? []) {
       expect(apresentacaoDoNicho("advocacia").toLowerCase(), termo).not.toContain(termo)
     }
-    // Nem preço, nem pedido, nem caixa: o parágrafo da advocacia é o único assim
+    // Nem preço, nem pedido, nem caixa: só advocacia e saúde são assim
     expect(apresentacaoDoNicho("advocacia")).not.toMatch(/preço|pedido|caixa/)
     expect(apresentacaoDoNicho("agendamento")).toMatch(/preço|caixa/)
+  })
+
+  it("saúde segue a mesma régua da advocacia, e nenhuma outra herda a trava dela", () => {
+    expect(validarApresentacao(apresentacaoDoNicho("saude"), "saude")).toEqual([])
+    expect(apresentacaoDoNicho("saude")).not.toMatch(/preço|pedido|caixa/)
+    for (const termo of TERMOS_BLOQUEADOS_POR_NICHO.saude ?? []) {
+      expect(apresentacaoDoNicho("saude").toLowerCase(), termo).not.toContain(termo)
+    }
+    expect(validarApresentacao("O pessoal avalia bem vocês.", "saude")).toEqual(["saude:avalia bem"])
+    expect(validarApresentacao("O pessoal avalia bem vocês.", "pet")).toEqual([])
   })
 
   it("escrita: sem emoji, sem markdown, sem marca de IA, e mais folgada que a abertura", () => {
