@@ -53,6 +53,7 @@ const PLATAFORMAS = [
   "ifood.com.br",
   "anota.ai",
   "goomer.app",
+  "cardapioaki.app",
   "booksy.com",
   "trinks.com",
   "doctoralia.com.br",

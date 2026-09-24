@@ -136,6 +136,9 @@ export const NOMES_DE_DESTINO: readonly (readonly [dominio: string, nome: string
   ["ifood.com.br", "iFood"],
   ["anota.ai", "Anota AI"],
   ["goomer.app", "Goomer"],
+  // A própria página escreve "Cardapio Aki", sem acento; aqui vai com, que é
+  // como se lê numa mensagem.
+  ["cardapioaki.app", "Cardápio Aki"],
   ["booksy.com", "Booksy"],
   ["trinks.com", "Trinks"],
   ["doctoralia.com.br", "Doctoralia"],
