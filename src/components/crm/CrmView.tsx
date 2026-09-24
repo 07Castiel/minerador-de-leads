@@ -3,12 +3,20 @@
 import { useMemo } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { KanbanIcon, ListIcon, PickaxeIcon } from "lucide-react"
+import { ChevronDownIcon, KanbanIcon, ListIcon, MapPinIcon, PickaxeIcon } from "lucide-react"
 
 import { ExportarLista } from "@/components/crm/ExportarLista"
 import { KanbanBoard } from "@/components/crm/KanbanBoard"
 import { LeadsTable } from "@/components/leads/LeadsTable"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -18,6 +26,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useLeadsDoFunil } from "@/hooks/useLeads"
+import {
+  type CidadeDoFunil,
+  cidadesDaUrl,
+  cidadesDoFunil,
+  cidadesParaUrl,
+  leadEstaNasCidades,
+} from "@/lib/leads/filtroCidade"
 import { temSiteComProblema } from "@/lib/leads/motivos"
 import { dataLocalIso, retornoPendente } from "@/lib/leads/proximoContato"
 import {
@@ -60,6 +75,15 @@ function ordenar(leads: Lead[], ordem: Ordem): Lead[] {
   return copia.sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
 }
 
+function rotuloDasCidades(cidades: CidadeDoFunil[], escolhidas: ReadonlySet<string>): string {
+  if (escolhidas.size === 0) return "Todas as cidades"
+  if (escolhidas.size === 1) {
+    const [chave] = escolhidas
+    return cidades.find((c) => c.chave === chave)?.nome ?? chave
+  }
+  return `${escolhidas.size} cidades`
+}
+
 // Filtros ficam na URL: dá pra voltar do detalhe do lead sem perder a visão.
 export function CrmView() {
   const { data: leads, isLoading, error } = useLeadsDoFunil()
@@ -76,6 +100,8 @@ export function CrmView() {
     () => new Set(atalhosParam.split(",").filter(Boolean) as Atalho[]),
     [atalhosParam]
   )
+  const cidadesParam = params.get("cidade")
+  const cidadesEscolhidas = useMemo(() => cidadesDaUrl(cidadesParam), [cidadesParam])
 
   function atualizar(mudancas: Record<string, string | null>) {
     const novos = new URLSearchParams(params.toString())
@@ -94,6 +120,13 @@ export function CrmView() {
     atualizar({ f: [...novos].join(",") || null })
   }
 
+  function alternarCidade(chave: string) {
+    const novas = new Set(cidadesEscolhidas)
+    if (novas.has(chave)) novas.delete(chave)
+    else novas.add(chave)
+    atualizar({ cidade: cidadesParaUrl(novas) })
+  }
+
   const categorias = useMemo(
     () =>
       Array.from(new Set((leads ?? []).map((l) => l.categoria).filter((c): c is string => !!c))).sort(
@@ -101,6 +134,7 @@ export function CrmView() {
       ),
     [leads]
   )
+  const cidades = useMemo(() => cidadesDoFunil(leads ?? []), [leads])
 
   const filtrados = useMemo(() => {
     const termo = busca.trim().toLowerCase()
@@ -114,6 +148,7 @@ export function CrmView() {
       if (atalhos.has("com_telefone") && !lead.telefone) return false
       if (atalhos.has(FILTRO_DESCARTADOS) && !semGancho(lead)) return false
       if (categoria && lead.categoria !== categoria) return false
+      if (!leadEstaNasCidades(lead, cidadesEscolhidas)) return false
       if (termo) {
         const texto = `${lead.nome} ${lead.bairro ?? ""} ${lead.cidade ?? ""}`.toLowerCase()
         if (!texto.includes(termo)) return false
@@ -121,7 +156,7 @@ export function CrmView() {
       return true
     })
     return ordenar(lista, ordem)
-  }, [leads, busca, categoria, ordem, atalhos])
+  }, [leads, busca, categoria, cidadesEscolhidas, ordem, atalhos])
 
   // O quadro é fila de trabalho: lead sem gancho some dele por padrão, mas fica
   // contado ao lado, a um clique da lista.
@@ -158,7 +193,8 @@ export function CrmView() {
               Lista
             </Button>
           </div>
-          <ExportarLista leads={leads ?? []} />
+          {/* Exporta o que está na tela: mesmos filtros, mesma visão, mesma ordem. */}
+          <ExportarLista leads={visiveis} />
           <Button asChild size="sm">
             <Link href="/buscar">
               <PickaxeIcon />
@@ -214,6 +250,46 @@ export function CrmView() {
             ))}
           </SelectContent>
         </Select>
+        {cidades.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant={cidadesEscolhidas.size > 0 ? "default" : "outline"}
+                className="h-9 w-48 justify-between font-normal"
+                aria-label="Cidades"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <MapPinIcon />
+                  <span className="truncate">{rotuloDasCidades(cidades, cidadesEscolhidas)}</span>
+                </span>
+                <ChevronDownIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-80 w-64">
+              {cidades.map((c) => (
+                <DropdownMenuCheckboxItem
+                  key={c.chave}
+                  checked={cidadesEscolhidas.has(c.chave)}
+                  // Marca várias sem o menu fechar a cada clique.
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={() => alternarCidade(c.chave)}
+                >
+                  <span className="truncate">{c.nome}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{c.total}</span>
+                </DropdownMenuCheckboxItem>
+              ))}
+              {cidadesEscolhidas.size > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => atualizar({ cidade: null })}>
+                    Limpar seleção
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         <Select value={ordem} onValueChange={(v) => atualizar({ ordem: v === "score" ? null : v })}>
           <SelectTrigger className="w-40" aria-label="Ordenar">
             <SelectValue />

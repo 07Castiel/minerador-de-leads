@@ -45,8 +45,9 @@ function faixaPadrao(agora: Date): number {
   return indice >= 0 ? indice : 0
 }
 
-// Todos os leads do CRM numa lista de texto, com a mesma mensagem que a janela
-// do WhatsApp geraria para cada um. Dá pra copiar ou baixar como .txt.
+// Os leads que o CRM está mostrando (já filtrados) numa lista de texto, com a
+// mesma mensagem que a janela do WhatsApp geraria para cada um. Dá pra copiar
+// ou baixar como .txt.
 export function ExportarLista({ leads }: { leads: Lead[] }) {
   const [aberto, setAberto] = useState(false)
   const [faixa, setFaixa] = useState(() => faixaPadrao(new Date()))
@@ -148,7 +149,8 @@ export function ExportarLista({ leads }: { leads: Lead[] }) {
           <DialogHeader>
             <DialogTitle>Exportar lista</DialogTitle>
             <DialogDescription>
-              {naLista} leads com telefone, cada um com a mensagem que a janela do WhatsApp geraria. Quem não tem
+              {naLista} leads com telefone entre os que o CRM está mostrando, cada um com a mensagem que a janela
+              do WhatsApp geraria. Quem não tem
               gancho sai com a mensagem em branco e o motivo.
             </DialogDescription>
           </DialogHeader>
