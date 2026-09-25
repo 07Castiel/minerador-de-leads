@@ -1,6 +1,7 @@
 // Regras puras do minerador (sem I/O): validação da busca, custo, input do
 // Apify e conversão do dataset em leads. Usadas no servidor e no navegador.
 
+import { motivoOrgaoPublico } from "@/lib/leads/orgaoPublico"
 import { classificarLink } from "@/lib/leads/presencaDigital"
 
 export const APIFY_ACTOR_ID = "compass~crawler-google-places"
@@ -376,6 +377,11 @@ export function mapearLugar(item: unknown): Resultado<LeadMinerado> {
   // pagar o filtro "skipClosedPlaces" do Apify.
   if (item.permanentlyClosed === true) return { ok: false, erro: `"${nome}" fechou definitivamente` }
   if (item.temporarilyClosed === true) return { ok: false, erro: `"${nome}" está fechado temporariamente` }
+
+  // Órgão público e instituição de ensino não podem contratar sem licitação, e
+  // clínica-escola de universidade não é cliente. Descarta de graça, na entrada.
+  const orgao = motivoOrgaoPublico(nome, texto(item.categoryName))
+  if (orgao) return { ok: false, erro: `"${nome}" é ${orgao}` }
 
   const location = isRecord(item.location) ? item.location : {}
   const avaliacoes = numero(item.reviewsCount, 0)

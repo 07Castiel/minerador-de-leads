@@ -10,13 +10,17 @@ import {
   APRESENTACAO_PADRAO,
   APRESENTACAO_POR_NICHO,
   CATEGORIAS_GENERICAS,
+  DEGRAUS_DE_AVALIACAO,
   FECHAMENTO_DA_APRESENTACAO,
   FOLLOW_UP,
+  GANCHO_REPUTACAO,
   GRUPOS_SO_DA_ABERTURA,
   FUSO_DA_ABORDAGEM,
   LACUNAS_DA_ABORDAGEM,
   LACUNAS_SO_DE_COMERCIO,
   LIMITES,
+  OBSERVACAO_REPUTACAO,
+  REPUTACAO_ALTA,
   LIMITES_DA_APRESENTACAO,
   LIMITES_DE_LINHA,
   MARCAS_DE_IA,
@@ -32,6 +36,7 @@ import {
   TERMOS_DE_PALAVRA_INTEIRA,
   TEXTOS_CURTOS_DAS_LACUNAS,
   TEXTOS_DAS_LACUNAS,
+  type GanchoDaAbordagem,
   type LacunaDaAbordagem,
   type NichoDaAbordagem,
   type TextosDasLacunas,
@@ -45,7 +50,8 @@ export type CamposDaAbordagem = CamposDoModelo
 type LacunaDaAbordagemDoLead = Extract<LacunaDoLead, { id: LacunaDaAbordagem }>
 
 export type DadosDaAbordagem = {
-  lacuna: LacunaDaAbordagem
+  // Uma lacuna (defeito) ou "reputacao_alta" (força)
+  lacuna: GanchoDaAbordagem
   nicho: string
   saudacao: string
   negocio: string
@@ -217,6 +223,53 @@ export function ancoraDoLead(lead: Pick<CamposDaAbordagem, "nome">, nicho: Nicho
   }
 }
 
+// Reputação alta: nota e avaliações acima do piso do config. Número ausente = não.
+export function reputacaoAlta(
+  lead: Pick<CamposDaAbordagem, "google_rating" | "google_avaliacoes_count">
+): boolean {
+  const nota = lead.google_rating
+  const avaliacoes = lead.google_avaliacoes_count
+  return (
+    nota !== null &&
+    nota >= REPUTACAO_ALTA.notaMinima &&
+    avaliacoes !== null &&
+    avaliacoes >= REPUTACAO_ALTA.avaliacoesMinimas
+  )
+}
+
+// "mais de 100 avaliações": arredonda pra baixo pelo maior degrau que couber. O
+// número exato entregaria raspagem, então nunca sai o valor cru.
+export function avaliacoesArredondadas(quantidade: number): string {
+  let degrau: number = DEGRAUS_DE_AVALIACAO[0]
+  for (const d of DEGRAUS_DE_AVALIACAO) if (quantidade >= d) degrau = d
+  return `mais de ${degrau} avaliações`
+}
+
+// Gancho de reputação alta, ou null quando o nicho não tem perguntaReputacao ou
+// o lead não é reputação alta. É rescue: prepararAbordagem só chama quando não
+// há lacuna. A observação é o número arredondado; a pergunta é a do nicho, sobre
+// como o cliente decide antes de chegar, não sobre agendamento.
+function dadosDeReputacao(
+  lead: CamposDaAbordagem,
+  nicho: NichoDaAbordagem,
+  saudacao: string
+): DadosDaAbordagem | null {
+  if (!nicho.perguntaReputacao) return null
+  if (!reputacaoAlta(lead) || lead.google_avaliacoes_count === null) return null
+  const observacao = preencher(OBSERVACAO_REPUTACAO, {
+    AVALIACOES: avaliacoesArredondadas(lead.google_avaliacoes_count),
+  })
+  return {
+    lacuna: GANCHO_REPUTACAO,
+    nicho: nicho.id,
+    saudacao,
+    ...ancoraDoLead(lead, nicho),
+    textoDaLacuna: observacao,
+    textoCurtoDaLacuna: observacao,
+    pergunta: nicho.perguntaReputacao,
+  }
+}
+
 export type OpcoesDaAbordagem = {
   // Lacunas das últimas mensagens registradas na org, a mais nova primeiro
   ultimasLacunas?: readonly LacunaDaAbordagem[]
@@ -239,9 +292,15 @@ export function prepararAbordagem(
   const nicho = resolverNicho(lead.categoria, termoDaBusca)
   const lacuna = escolherLacuna(lacunasDaAbordagem(lead, nicho), ultimasLacunas)
   if (!lacuna) {
-    return descartadoSemGancho(lead)
-      ? { tipo: "descartado_sem_gancho", nicho: nicho.id }
-      : { tipo: "manual", motivo: "sem_lacuna", nicho: nicho.id }
+    // Site que abre e sem defeito seria fim de linha; reputação alta salva esse
+    // lead com o ângulo da reputação, nos nichos que têm perguntaReputacao. Site
+    // indefinido continua manual — sem saber do site, não afirmamos que não há gancho.
+    if (descartadoSemGancho(lead)) {
+      const reputacao = dadosDeReputacao(lead, nicho, saudacao)
+      if (reputacao) return { tipo: "pronta", dados: reputacao }
+      return { tipo: "descartado_sem_gancho", nicho: nicho.id }
+    }
+    return { tipo: "manual", motivo: "sem_lacuna", nicho: nicho.id }
   }
 
   return {
@@ -480,7 +539,7 @@ export type MensagemDaJanela =
   | { tipo: "manual"; motivo: "sem_lacuna" | "mensagem_fixa_invalida"; bloqueios: TentativaBloqueada[] }
   | {
       tipo: "pronta"
-      lacuna: LacunaDaAbordagem
+      lacuna: GanchoDaAbordagem
       // Mensagem 1, que vai sozinha antes do texto
       saudacao: string
       // Mensagem 2

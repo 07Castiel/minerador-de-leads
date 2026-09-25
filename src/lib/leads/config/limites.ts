@@ -22,6 +22,18 @@ export const SAUDACOES = [
 // é ela que faz a conversa começar como conversa, e não como anúncio.
 export const MENSAGEM_DE_SAUDACAO = "{SAUDACAO} Tudo bem?"
 
+// Reputação alta: nota e avaliações a partir das quais o gancho deixa de ser um
+// defeito e passa a ser a reputação. Só citamos avaliação arredondada (nunca o
+// número exato, que entrega raspagem), e só nos nichos com perguntaReputacao.
+export const REPUTACAO_ALTA = { notaMinima: 4.8, avaliacoesMinimas: 50 } as const
+
+// Degraus do arredondamento pra baixo: 132 vira "mais de 100 avaliações".
+export const DEGRAUS_DE_AVALIACAO = [50, 100, 200, 300, 500, 1000, 2000, 5000] as const
+
+// Observação da reputação, no lugar de {LACUNA} da MENSAGEM_FIXA. {AVALIACOES}
+// já vem arredondado ("mais de 100 avaliações").
+export const OBSERVACAO_REPUTACAO = "vocês têm {AVALIACOES}"
+
 export const LIMITES = {
   caracteres: 400,
   // Menos fotos que isso no perfil = lacuna "poucas_fotos"

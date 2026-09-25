@@ -247,6 +247,21 @@ describe("mapearLugar", () => {
     expect(mapearLugar({ ...ITEM_APIFY, temporarilyClosed: true }).ok).toBe(false)
   })
 
+  it("descarta órgão público e clínica-escola, com o motivo", () => {
+    const prefeitura = mapearLugar({ ...ITEM_APIFY, title: "Prefeitura Municipal de Sobral" })
+    expect(prefeitura.ok).toBe(false)
+    expect(!prefeitura.ok && prefeitura.erro).toContain("órgão público")
+
+    const ubs = mapearLugar({ ...ITEM_APIFY, title: "UBS Sinhá Sabóia", categoryName: "Posto de saúde" })
+    expect(!ubs.ok && ubs.erro).toContain("unidade de saúde pública")
+
+    const escola = mapearLugar({ ...ITEM_APIFY, title: "Clínica-Escola de Odontologia UNINTA" })
+    expect(!escola.ok && escola.erro).toContain("instituição de ensino")
+
+    // Negócio privado continua passando
+    expect(mapearLugar({ ...ITEM_APIFY, title: "Odontologia Sorriso Real" }).ok).toBe(true)
+  })
+
   it("usa telefone sem formatação quando o formatado falta", () => {
     const r = mapearLugar({ ...ITEM_APIFY, phone: null })
     expect(r.ok && r.valor.telefone).toBe("+5588996123456")

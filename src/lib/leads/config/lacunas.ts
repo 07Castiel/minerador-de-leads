@@ -24,6 +24,14 @@ export const LACUNAS_DA_ABORDAGEM = [
 
 export type LacunaDaAbordagem = (typeof LACUNAS_DA_ABORDAGEM)[number]
 
+// Reputação alta não é uma lacuna (não é defeito): é o gancho de quem já tem
+// site e muitas avaliações. Entra como rescue quando não há lacuna nenhuma, só
+// nos nichos com perguntaReputacao. Guardado como texto em abordagens.lacuna.
+export const GANCHO_REPUTACAO = "reputacao_alta" as const
+
+// O id do gancho gravado: uma lacuna, ou reputação alta.
+export type GanchoDaAbordagem = LacunaDaAbordagem | typeof GANCHO_REPUTACAO
+
 // Só valem em nicho de comércio (NichoDaAbordagem.comercio).
 export const LACUNAS_SO_DE_COMERCIO: readonly LacunaDaAbordagem[] = ["poucas_fotos", "pouca_avaliacao"]
 
