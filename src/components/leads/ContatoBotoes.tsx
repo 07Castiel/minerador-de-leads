@@ -3,6 +3,7 @@
 import { PhoneIcon } from "lucide-react"
 
 import { BotaoWhatsApp } from "@/components/leads/BotaoWhatsApp"
+import { TelefoneFixoBadge } from "@/components/leads/TelefoneFixoBadge"
 import { Button } from "@/components/ui/button"
 import { linkLigacao, pareceCelular } from "@/lib/contato"
 import type { Lead } from "@/types/lead"
@@ -32,6 +33,7 @@ export function ContatoBotoes({ lead, tamanho = "sm" }: ContatoBotoesProps) {
         </Button>
       )}
       {whatsapp && <BotaoWhatsApp lead={lead} size={size} />}
+      <TelefoneFixoBadge telefone={lead.telefone} />
     </div>
   )
 }

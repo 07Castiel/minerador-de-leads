@@ -163,6 +163,15 @@ describe("listaExportada", () => {
     expect(texto).not.toContain("Sem Telefone Advogados")
   })
 
+  it("bloco de lead com telefone fixo leva o aviso; celular não", () => {
+    const fixo = lead({ ...SEM_SITE, id: "f", nome: "Fixo Advogados", telefone: "(88) 3611-1234" })
+    const celular = lead({ ...SEM_SITE, id: "cel", nome: "Celular Advogados" })
+    const { texto } = listaExportada([fixo, celular], { faixa: FAIXA, agora: MANHA })
+    const [blocoFixo, blocoCelular] = texto.split("\n\n").slice(1)
+    expect(blocoFixo).toContain("⚠️ Telefone fixo — provavelmente sem WhatsApp")
+    expect(blocoCelular).not.toContain("Telefone fixo")
+  })
+
   it("cabeçalho sozinho", () => {
     expect(cabecalhoDaLista(SAUDACOES[1], 7)).toBe(
       'Mensagem 1, antes de cada uma (para enviar entre 12:00 e 18:00): "Boa tarde! Tudo bem?" — 7 leads'
