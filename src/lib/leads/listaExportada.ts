@@ -26,6 +26,8 @@ import {
 } from "@/lib/leads/abordagem"
 import { SAUDACOES, type LacunaDaAbordagem } from "@/lib/leads/abordagemConfig"
 import type { RegistroDeAbordagem } from "@/lib/leads/abordagens"
+import { faixaDeDistancia } from "@/lib/leads/faixaDistancia"
+import { motivoOrgaoPublico } from "@/lib/leads/orgaoPublico"
 import { isEtapa, type Etapa, type Lead } from "@/types/lead"
 
 export type LeadDaLista = CamposDaAbordagem & Pick<Lead, "id" | "telefone" | "etapa">
@@ -105,6 +107,12 @@ export function itemDaLista(lead: LeadDaLista, opcoes: OpcoesDaLista): ItemDaLis
   const nicho = resolverNicho(lead.categoria, opcoes.termoDaBusca?.(lead) ?? null)
   const vazio = (motivo: string): ItemDaLista => ({ lead, texto: "", motivo, registro: null })
 
+  // Órgão público ou instituição de ensino que tenha entrado à mão: sai em
+  // branco, com o motivo, em vez de gerar mensagem. O minerador já descarta
+  // esses na entrada; aqui é a rede pra quem foi importado por fora.
+  const orgao = motivoOrgaoPublico(lead.nome, lead.categoria)
+  if (orgao) return vazio(orgao)
+
   // Quem já foi abordado leva o follow-up; quem já avançou ou saiu, nada.
   if (etapa !== "novo") {
     if (etapa !== "abordado" && etapa !== "follow_up") return vazio(MOTIVO_DA_ETAPA)
@@ -156,7 +164,13 @@ export type ListaExportada = { texto: string; itens: ItemDaLista[] }
 
 // Lead sem telefone fica de fora: a lista existe pra mandar no WhatsApp.
 export function listaExportada(leads: readonly LeadDaLista[], opcoes: OpcoesDaLista): ListaExportada {
-  const comTelefone = leads.filter(temTelefone)
+  // Da Faixa 1 (mais perto de Sobral) para a 3. Sort estável: dentro da mesma
+  // faixa, a ordem que o CRM já mostrava é mantida.
+  const comTelefone = leads
+    .filter(temTelefone)
+    .map((lead, ordem) => ({ lead, ordem }))
+    .sort((a, b) => faixaDeDistancia(a.lead.cidade) - faixaDeDistancia(b.lead.cidade) || a.ordem - b.ordem)
+    .map((item) => item.lead)
   const ultimas = [...(opcoes.ultimasLacunas ?? [])]
   const itens: ItemDaLista[] = []
 

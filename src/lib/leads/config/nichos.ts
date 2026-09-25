@@ -22,6 +22,11 @@ export type NichoDaAbordagem = {
   comercio?: boolean
   // Âncora quando o nome do negócio tem uma pessoa ({PESSOA}); sem isso, ANCORA_PADRAO
   ancoraComPessoa?: string
+  // Pergunta para o lead de reputação alta (4,8+ e muitas avaliações), quando
+  // não há lacuna nenhuma. Aqui o ângulo muda: quem já capta bem não é abordado
+  // pelo agendamento, e sim por como o cliente decide antes de chegar. Só os
+  // nichos com este campo geram esse gancho; sem ele, o lead segue descartado.
+  perguntaReputacao?: string
 }
 
 // Ordem importa: vale o primeiro nicho com algum termo.
@@ -66,6 +71,11 @@ export const NICHOS: readonly NichoDaAbordagem[] = [
     // Sem "consulta" e sem citar avaliação: a pergunta é sobre o caminho de
     // quem procura, não sobre a reputação de quem atende.
     pergunta: "quem precisa marcar um horário com vocês resolve tudo por aqui?",
+    // Reputação forte quer dizer que o consultório já capta paciente: a pergunta
+    // deixa de ser sobre a agenda e passa a ser sobre a decisão de quem chega.
+    // Sem citar avaliação como elogio ("boas avaliações" é vedado): a observação
+    // é o número arredondado, e a pergunta é sobre a pesquisa do paciente.
+    perguntaReputacao: "quem chega até vocês costuma pesquisar bastante antes de escolher?",
     // Sem comercio: foto e avaliação não entram como gancho neste nicho.
     // "o consultório de {PESSOA}": o substantivo carrega o gênero, então
     // "Dra. Joana" e "Dr. João" saem certos, igual ao escritório da advocacia.
