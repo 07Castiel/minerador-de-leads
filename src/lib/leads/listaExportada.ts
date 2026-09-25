@@ -12,7 +12,7 @@
 // camada 1 da janela do WhatsApp (nada de modelo à parte) e passa pela mesma
 // validação: o que não passar sai em branco, com o motivo do lado.
 
-import { telefoneInternacional } from "@/lib/contato"
+import { pareceFixo, telefoneInternacional } from "@/lib/contato"
 import {
   descreverMotivo,
   mensagemDeRetorno,
@@ -58,6 +58,10 @@ export function temTelefone(lead: Pick<Lead, "telefone">): boolean {
   return telefoneInternacional(lead.telefone) !== null
 }
 
+// Fixo entra na lista (dá pra ligar), mas dificilmente recebe WhatsApp: o aviso
+// vem logo abaixo do número pra não gastar mensagem à toa.
+const AVISO_TELEFONE_FIXO = "⚠️ Telefone fixo — provavelmente sem WhatsApp"
+
 export function blocoDoLead(lead: LeadDaLista, mensagem: string, motivo: string | null): string {
   return [
     // Alguns nomes do Google começam com emoji ou símbolo solto
@@ -65,6 +69,7 @@ export function blocoDoLead(lead: LeadDaLista, mensagem: string, motivo: string 
     `Nicho: ${nichoDaLista(lead.categoria)}`,
     `Cidade: ${lead.cidade?.trim() || "Não informada"}`,
     telefoneDaLista(lead.telefone),
+    ...(pareceFixo(lead.telefone) ? [AVISO_TELEFONE_FIXO] : []),
     `Mensagem 2: "${mensagem.trim()}"${mensagem.trim() === "" && motivo ? ` (${motivo})` : ""}`,
   ].join("\n")
 }

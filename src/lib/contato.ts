@@ -24,6 +24,13 @@ export function pareceCelular(telefone: string | null | undefined): boolean {
   return numero !== null && numero.length === 13 && numero[4] === "9"
 }
 
+// Fixo tem 8 dígitos depois do DDD (total 12 com o DDI 55), contra os 9 do
+// celular. Como quase nunca tem WhatsApp, vale destacar pra não gastar mensagem.
+export function pareceFixo(telefone: string | null | undefined): boolean {
+  const numero = telefoneInternacional(telefone)
+  return numero !== null && numero.length === 12
+}
+
 export function linkLigacao(telefone: string | null | undefined): string | null {
   const numero = telefoneInternacional(telefone)
   return numero ? `tel:+${numero}` : null

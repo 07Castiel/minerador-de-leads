@@ -16,6 +16,7 @@ import {
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, CheckIcon, XIcon } from "lucide-react"
 
 import { EtapaBadge } from "@/components/leads/EtapaBadge"
+import { TelefoneFixoBadge } from "@/components/leads/TelefoneFixoBadge"
 import { TemperaturaBadge } from "@/components/leads/TemperaturaBadge"
 import { Button } from "@/components/ui/button"
 import {
@@ -41,7 +42,16 @@ const columns: LegacyColumnDef<Lead, any>[] = [
   }),
   columnHelper.accessor("telefone", {
     header: "Telefone",
-    cell: (info) => <span className="whitespace-nowrap tabular-nums">{info.getValue() ?? "—"}</span>,
+    cell: (info) => {
+      const telefone = info.getValue()
+      if (!telefone) return "—"
+      return (
+        <div className="flex items-center gap-1.5">
+          <span className="whitespace-nowrap tabular-nums">{telefone}</span>
+          <TelefoneFixoBadge telefone={telefone} />
+        </div>
+      )
+    },
   }),
   columnHelper.accessor("bairro", {
     header: "Bairro",

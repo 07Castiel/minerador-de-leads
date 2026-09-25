@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { linkLigacao, linkWhatsApp, pareceCelular, telefoneInternacional } from "@/lib/contato"
+import { linkLigacao, linkWhatsApp, pareceCelular, pareceFixo, telefoneInternacional } from "@/lib/contato"
 
 describe("telefoneInternacional", () => {
   it.each([
@@ -24,6 +24,13 @@ describe("links de contato", () => {
   it("só considera celular quem tem 9 dígitos começando com 9", () => {
     expect(pareceCelular("(88) 99612-3456")).toBe(true)
     expect(pareceCelular("(88) 3611-1234")).toBe(false)
+  })
+
+  it("considera fixo quem tem 8 dígitos depois do DDD, e nada que não seja BR", () => {
+    expect(pareceFixo("(88) 3611-1234")).toBe(true)
+    expect(pareceFixo("(88) 99612-3456")).toBe(false)
+    expect(pareceFixo("+1 415 555 0100")).toBe(false)
+    expect(pareceFixo(null)).toBe(false)
   })
 
   it("monta tel: e wa.me com DDI e mensagem codificada", () => {

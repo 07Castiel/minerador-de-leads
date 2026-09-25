@@ -9,6 +9,7 @@ import { EtapaBadge } from "@/components/leads/EtapaBadge"
 import { LeadEditForm } from "@/components/leads/LeadEditForm"
 import { MotivosChips } from "@/components/leads/MotivosChips"
 import { RetornoBadge } from "@/components/leads/RetornoBadge"
+import { TelefoneFixoBadge } from "@/components/leads/TelefoneFixoBadge"
 import { TemperaturaBadge } from "@/components/leads/TemperaturaBadge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -94,7 +95,13 @@ export function LeadDetail({ id }: { id: string }) {
               <dl className="grid grid-cols-2 gap-3">
                 <Field label="Categoria" value={lead.categoria} />
                 <Field label="Score" value={lead.score} />
-                <Field label="Telefone" value={lead.telefone} />
+                <div>
+                  <dt className="text-sm text-muted-foreground">Telefone</dt>
+                  <dd className="flex items-center gap-1.5 text-sm">
+                    {lead.telefone?.trim() || "—"}
+                    <TelefoneFixoBadge telefone={lead.telefone} />
+                  </dd>
+                </div>
                 <Field label="Origem" value={lead.origem} />
               </dl>
             </CardContent>
